@@ -1,10 +1,13 @@
-label-studio==1.6.0
-pytesseract==0.3.10
-jupyterlab
-shapely
-scikit-learn
+#apt-get update && apt-get install -y libpq-dev
+paddlepaddle
 paddleocr
 pdf2image
 pillow
 fuzzywuzzy
-opencv-python-headless numpy
+python-Levenshtein  # Improves fuzzywuzzy performance
+opencv-python-headless  # Use headless version for servers
+label-studio==1.6.0
+psycopg2-binary  # Fixes PostgreSQL dependency for label-studio
+jupyterlab
+shapely
+scikit-learn

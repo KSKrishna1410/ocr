@@ -88,19 +88,6 @@ def generate_json_output(extracted_data):
 
     return json.dumps(output, indent=4)
 
-# Example extracted data (simulating PaddleOCR output)
-# extracted_data = {
-#     "invoice_number": {"key_bbox": [[100, 200], [150, 200], [150, 250], [100, 250]], 
-#                        "value": "1234", 
-#                        "value_bbox": [[300, 200], [350, 200], [350, 250], [300, 250]]},
-#     "invoice_date": {"key_bbox": [[100, 300], [150, 300], [150, 350], [100, 350]], 
-#                      "value": "12/09/2024", 
-#                      "value_bbox": [[300, 300], [350, 300], [350, 350], [300, 350]]}
-# }
-
-# Generate and print JSON output
-
-
 
 def preprocess_image(image_path):
     """Enhances image for better OCR accuracy"""
@@ -129,19 +116,6 @@ def extract_text(image_path):
     
     return find_aligned_value(extracted_data, doc_key_list_array)
 
-def match_key_old(text, key_list, threshold=85):
-    """Matches extracted text to predefined keys using fuzzy matching."""
-    best_match = None
-    highest_score = 0
-
-    for key in key_list:
-        score = fuzz.partial_ratio(text.lower(), key.lower())  # Partial match
-        if score > highest_score and score >= threshold:
-            highest_score = score
-            best_match = key
-
-    return best_match if highest_score >= threshold else None
-
 def match_key(text, key_list, threshold=85):
     best_match, score = process.extractOne(text.lower(), key_list)
     return best_match if score >= threshold else None
@@ -158,67 +132,12 @@ def get_x_y_positions(bbox):
     top_y = min(bbox[0][1], bbox[1][1], bbox[2][1], bbox[3][1])  # Top Y-coordinate
     return key_end_x, top_y
 
-def find_right_aligned_pairs_old(extracted_data, key_list, initial_y_threshold=10, max_y_threshold=100, step=10):
-    """Finds key-value pairs where the value is directly to the right of the key."""
-    keys = []
-    values = []
-    
-    for text, bbox, confidence in extracted_data:
-        matched_key = match_key(text, key_list)
-        if matched_key:
-            keys.append((matched_key, bbox, text))
-        else:
-            values.append((text, bbox))
-
-    keys.sort(key=lambda x: x[1][0][0])  # Sort by X position
-    values.sort(key=lambda x: x[1][0][0])
-
-    key_value_pairs = {}
-    
-    for key_text, key_bbox, original_key_text in keys:
-        key_x, key_y = get_x_y_positions(key_bbox)
-        closest_value = None
-        min_x_distance = float('inf')
-
-        y_threshold = initial_y_threshold
-        while y_threshold <= max_y_threshold:
-            for val_text, val_bbox in values:
-                val_x, val_y = get_x_y_positions(val_bbox)
-
-                if val_x > key_x and abs(val_y - key_y) <= y_threshold:
-                    x_distance = val_x - key_x
-
-                    if x_distance < min_x_distance:
-                        min_x_distance = x_distance
-                        closest_value = val_text
-                        closest_bbox = val_bbox
-
-            if closest_value:
-                break
-            y_threshold += step
-
-        if closest_value:
-            key_value_pairs[key_text] = {
-                "value": closest_value,
-                "key_bbox": key_bbox,
-                "value_bbox": closest_bbox
-            }
-
-    return key_value_pairs
-
-
 def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
     """Finds key-value pairs where the value is directly to the right of the key."""
     keys = []
     values = []
     
     # Step 1: Categorize extracted text into keys and values
-    # for text, bbox, confidence in extracted_data:
-    #     matched_key = match_key(text, doc_key_list)
-    #     if matched_key:
-    #         keys.append((matched_key, bbox, text))
-    #     else:
-    #         values.append((text, bbox))
     for entry in extracted_data:
         text, bbox, confidence = entry
     
@@ -233,6 +152,7 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
     keys.sort(key=lambda x: (x[1][0][1], x[1][0][0]))  # Sort by Y, then X
     values.sort(key=lambda x: (x[1][0][1], x[1][0][0]))
     bottom_tolerance = 20  # Adjust as needed
+    
     # Step 3: Matching the paired value for the given key
     key_value_pairs = []
     capturedMethod = None
@@ -309,37 +229,31 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                 "method": 'colon_identification',
                 "doc_text" : eachKey['key']
             })
-            # key_value_pairs[key_text] = {
-            #         "value": eachKey["value"],
-            #         "key_bbox": json.loads(eachKey['key_bounding_box']),
-            #         "value_bbox": json.loads(eachKey['key_bounding_box']),
-            #         "method": 'colon_identification',
-            #         "doc_text" : eachKey['key']
-            #     }
     return key_value_pairs
 
 def process_invoice(image_path):
     """Extracts key-value pairs from an invoice image."""
     extracted_data = extract_text(image_path)
     print("\n🔹 Extracted Key-Value Pairs:")
-    # for key, value in extracted_data.items():
-    #     print(f"{key} → {value}")
+    for obj in extracted_data:
+        print(f"{obj['key']} → {obj['value']}")
     # json_output = generate_json_output(extracted_data)
     extracted_data = json.dumps(extracted_data, indent=4)
+    
     print(extracted_data)
     # return extracted_data
 
 if __name__ == "__main__":
 
     # Right Aligned key_value
-    # image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\sree_cammphor_works-1.png"
-    # image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\iteminvoicedownload-11.png"
-    # image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\21.09.2024_shah_ghouse_hotel-1.png"
-    # image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\amazon_invoice_(1)-1.png"
-    # image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\13.05.2024__digital_track-1.png"
+    # image_path = r"document/sree_cammphor_works-1.png"
+    # image_path = r"document/iteminvoicedownload-11.png"
+    # image_path = r"document/21.09.2024_shah_ghouse_hotel-1.png"
+    # image_path = r"document/amazon_invoice_(1)-1.png"
+    # image_path = r"document/13.05.2024__digital_track-1.png"
     
     # Bottom Aligned key_value
-    image_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\layoutlmv3-base\image\training_images\15.04.2024_global_technologies-1.png"
+    image_path = r"document/15.04.2024_global_technologies-1.png"
     
     doc_key_list = []
     process_invoice(image_path)

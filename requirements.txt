@@ -3,3 +3,8 @@ pytesseract==0.3.10
 jupyterlab
 shapely
 scikit-learn
+paddleocr
+pdf2image
+pillow
+fuzzywuzzy
+opencv-python-headless numpy

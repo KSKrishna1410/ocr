@@ -11,3 +11,6 @@ psycopg2-binary  # Fixes PostgreSQL dependency for label-studio
 jupyterlab
 shapely
 scikit-learn
+
+#pip install -U paddlepaddle paddleocr pdf2image pillow fuzzywuzzy
+#pip install -U python-Levenshtein opencv-python-headless label-studio==1.6.0 label-studio==1.6.0 jupyterlab shapely scikit-learn psycopg2-binary

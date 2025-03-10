@@ -1,18 +1,20 @@
 import os
 import argparse
 from convert_pdftoImage import pdf2Image
-from getInvoiceKeyDynamicsV1 import process_invoice
+from getKeyValueResults import process_invoice
+from generateKey_mapping import generate_key_mapping
+# from identifyTableData import detectImage
 
 # File Path
 # input_folder = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs"  # Folder containing PDFs
 # output_folder = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs\images"  # Folder to save PNGs
 
-def main(input_folder, output_folder):
+def main(input_folder, output_folder, docType):
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
     # Convert PDFs to images and get list of image paths
-    
+    keyMappingData = generate_key_mapping(docType);
     for file in os.listdir(input_folder):
         file_name = os.path.splitext(file)[0]  # Extract filename without extension
         print(f"Filename: {file_name}")  # Print or store it for further use
@@ -28,9 +30,8 @@ def main(input_folder, output_folder):
         for image_path in image_paths:
             print(f"\n🔍 Processing Image: {image_path}")
             page_file_name = os.path.splitext(os.path.basename(image_path))[0]
-            extracted_data = process_invoice(image_path,page_file_name,output_folder)
-            print(extracted_data)
-                # Generate output JSON filename
+            # detectImage(image_path,page_file_name)
+            extracted_data = process_invoice(image_path,page_file_name,output_folder,keyMappingData)
             base_name = os.path.splitext(os.path.basename(image_path))[0]  # Extract filename without extension
             output_path = os.path.join(output_folder, f"{base_name}.json")  # Save JSON in output folder
 
@@ -39,16 +40,17 @@ def main(input_folder, output_folder):
                 json_file.write(extracted_data)
 
             print(f"✅ JSON output saved: {output_path}")
-            # return extracted_data
+    return extracted_data
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract invoice details from PDFs in a folder.")
     parser.add_argument("input_folder", type=str, help="Path to the input folder containing PDFs")
     parser.add_argument("output_folder", type=str, help="Path to the output folder for extracted images")
+    parser.add_argument("docType", type=str, help="Document type not Specified")
 
     args = parser.parse_args()
     
-    main(args.input_folder, args.output_folder)
+    main(args.input_folder, args.output_folder, args.docType)
 
 
 # python .\main.py "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs" "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs\images"

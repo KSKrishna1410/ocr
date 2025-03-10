@@ -14,7 +14,7 @@ import json
 # poppler_path = "/usr/bin/"
 poppler_path = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\Release-24.08.0-0\poppler-24.08.0\Library\bin"
 
-# File Path
+# File Path new commit
 # input_folder = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs"  # Folder containing PDFs
 # output_folder = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\docs\images"  # Folder to save PNGs
 

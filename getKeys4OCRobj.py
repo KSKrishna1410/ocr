@@ -14,6 +14,15 @@ def getKeylist(actual_ocr_output, key_mapping):
     matched_keys = []
     matched_keys_list = []
     document_text_list = [entry[1][0].lower() for entry in actual_ocr_output[0]]
+
+    # document_text_list = []
+    # print('Entry from actual_ocr_output       ------->    ',actual_ocr_output )
+    # for entry in actual_ocr_output:
+    #     print('Entry from Actual OCR       ------->    ',entry )
+    #     if isinstance(entry[1][0], str):
+    #         document_text_list.append(entry[1][0].lower())
+    #     else:
+    #         document_text_list.append(entry[1][0])  # Assign as is if not a string
     document_text_lower = "\n".join(document_text_list)  # Convert list to single string
 
     # Preprocess key mapping into regex patterns
@@ -48,6 +57,7 @@ def getKeylist(actual_ocr_output, key_mapping):
         # print(f"text_lower '{text_lower}' variation_to_standard -> '{variation_to_standard}'")
         text_lower = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", text_lower.strip())
         match = re.match(r"(.+?):\s*(.+)", text)
+        # re.compile(r"([\w\s]+):\s*(.+)", re.IGNORECASE)
         if match:
             key, value = match.groups()  # Extract pre-text (key) and post-text (value)
             for matched_key in matched_keys:

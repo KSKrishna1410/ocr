@@ -1,16 +1,15 @@
-#apt-get update && apt-get install -y libpq-dev
-paddlepaddle
-paddleocr
-pdf2image
-pillow
-fuzzywuzzy
-python-Levenshtein  # Improves fuzzywuzzy performance
-opencv-python-headless  # Use headless version for servers
-label-studio==1.6.0
-psycopg2-binary  # Fixes PostgreSQL dependency for label-studio
-jupyterlab
-shapely
-scikit-learn
-
-#pip install -U paddlepaddle paddleocr pdf2image pillow fuzzywuzzy
-#pip install -U python-Levenshtein opencv-python-headless label-studio==1.6.0 label-studio==1.6.0 jupyterlab shapely scikit-learn psycopg2-binary
+fitz==0.0.1.dev2
+fuzzywuzzy==0.18.0
+layoutparser==0.3.4
+numpy==2.2.3
+opencv_contrib_python==4.11.0.86
+opencv_python==4.11.0.86
+opencv_python_headless==4.11.0.86
+paddledet==2.6.0
+paddleocr==2.9.1
+paddleocr.egg==info
+pandas==2.2.3
+pdf2image==1.17.0
+Pillow==11.1.0
+tabula_py==2.10.0
+tabulate==0.9.0

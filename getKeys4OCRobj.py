@@ -75,4 +75,5 @@ def getKeylist(actual_ocr_output, key_mapping):
     for matched_key in matched_keys:
         matched_keys_list.append(f"{matched_key['key']} -- {matched_key['standard_key']}")
     print(f"🔹 🔹 🔹 matched_keys_list '{matched_keys_list}'")
+    print(f"🔹 🔹 🔹 matched_keys '{matched_keys}'")
     return matched_keys

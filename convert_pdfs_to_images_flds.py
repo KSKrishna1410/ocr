@@ -2,8 +2,8 @@ import fitz
 import os
 
 # Input and output folder paths
-input_folder = "C:/Users/nisha/Documents/ProductDevelopement/genAI/Invoice Review/India/Standard_inc"  # Folder containing PDFs
-output_folder = "C:/Users/nisha/Documents/ProductDevelopement/genAI/Invoice Review/India/Standard_inc/images"  # Folder to save PNGs
+input_folder = r"C:\Users\nisha\Documents\ProductDevelopement\genAI\Bank_STmt"  # Folder containing PDFs
+output_folder = r"C:\Users\nisha\Documents\ProductDevelopement\genAI\Bank_STmt/images"  # Folder to save PNGs
 
 # Ensure output folder exists
 os.makedirs(output_folder, exist_ok=True)

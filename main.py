@@ -33,6 +33,7 @@ def main(input_folder, output_folder, docType):
             "headerData": [],
             "lineTabulaData": []
         }
+        tableInfo = []
         # Loop through each image path and process the invoice
         for index, image_path in enumerate(image_paths):
             print(f"\n🔍 Processing Image: {image_path}")

@@ -6,6 +6,7 @@ from generateKey_mapping import generate_key_mapping
 from mPgTableExtraction import runTabuleProcess_file
 import json
 import numpy as np
+
 # from identifyTableData import detectImage
 
 # File Path
@@ -17,7 +18,7 @@ def main(input_folder, output_folder, docType):
     os.makedirs(output_folder, exist_ok=True)
     extracted_data = []
     # Convert PDFs to images and get list of image paths
-    # keyMappingData = generate_key_mapping(docType);
+    keyMappingData = generate_key_mapping(docType);
     for index, file in enumerate(os.listdir(input_folder)):
         file_name = os.path.splitext(file)[0]  # Extract filename without extension
         print(f"Filename: {file_name}")  # Print or store it for further use
@@ -36,11 +37,11 @@ def main(input_folder, output_folder, docType):
         for index, image_path in enumerate(image_paths):
             print(f"\n🔍 Processing Image: {image_path}")
             page_file_name = os.path.splitext(os.path.basename(image_path))[0]
-            layoutOutput = detectImage(image_path,page_file_name,output_folder)
+            # layoutOutput = detectImage(image_path,page_file_name,output_folder)
             
-            # extracted_data = process_invoice(image_path,page_file_name,output_folder,keyMappingData)
-            # base_name = os.path.splitext(os.path.basename(image_path))[0]  # Extract filename without extension
-            # output_path = os.path.join(output_folder, f"{base_name}.json")  # Save JSON in output folder
+            extracted_data = process_invoice(image_path,page_file_name,output_folder,keyMappingData)
+            base_name = os.path.splitext(os.path.basename(image_path))[0]  # Extract filename without extension
+            output_path = os.path.join(output_folder, f"{base_name}.json")  # Save JSON in output folder
 
             # Save JSON file
             with open(output_path, "w", encoding="utf-8") as json_file:

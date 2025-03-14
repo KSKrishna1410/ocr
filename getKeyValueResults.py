@@ -10,54 +10,8 @@ import csv
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
-csv_file = "extracted_invoice_data.csv"
-key_mapping = {
-    "tax_amount": ["tax amount", "total tax", "tax payable", "gst amount", "Total taxes"],
-    "supplier_name": ["Restaurant Name", "supplier name", "vendor name", "company name"],
-    "supplier_gstin": ["GSTIN Number","supplier gstin", "supplier gst", "vendor gst number", "GSTIN/UIN", "Restaurant GSTIN","GSTIN: 36AAFCB7707D1ZV"],
-    "supplier_details": ["supplier details", "vendor details", "seller info"],
-    "sub_total_gst": ["sub total of gst", "gst subtotal", "total gst", "Sub Total"],
-    "sgst_rate": ["sgst rate", "state gst rate","SGST/UTGST","SGST/"],
-    "sgst_amount": ["sgst amount", "state gst amount"],
-    "receiver_details": ["receiver details", "buyer details", "customer info"],
-    "po_number": ["po no#", "purchase order number", "po number", "Order ID "],
-    "pan_number": ["pan number", "permanent account number"],
-    "irn_number": ["irn no", "invoice reference number"],
-    "invoice_total_amount": ["invoice total amount", "grand total", "final amount", "Total","Invoice Total"],
-    "invoice_number": ["Invoice#","invoice number","Invoice#", "Invoice no", "bill number"],
-    "invoice_date": ["Dated","invoice date","Invoice Date", "date of invoice", "bill date"],
-    "invoice_amount": ["invoice amount","Total", "total amount", "amount payable","Subtotal"],
-    "igst_rate": ["igst rate", "integrated gst rate", "IGST", "IGST%", "IGST %"],
-    "igst_amount": ["igst amount", "integrated gst amount"],
-    "hsn_code": ["hsn code", "hsn"],
-    "freight": ["freight", "shipping charges", "delivery charges"],
-    "due_date": ["due date", "payment due date", "last payment date"],
-    "discount": ["discount", "rebate", "price reduction"],
-    "customer_name": ["customer name", "buyer name", "Buyer"],
-    "customer_details": ["Customer Address"],
-    "currency": ["currency", "invoice currency", "payment currency"],
-    "cin_number": ["cin number", "corporate identification number"],
-    "cgst_rate": ["cgst rate", "central gst rate","CGST"],
-    "cgst_amount": ["cgst amount", "central gst amount"],
-    "unit_price": ["unit price", "rate per unit", "price per item"],
-    "unit": ["unit", "measurement unit"],
-    "roundoff": ["roundoff", "rounding adjustment"],
-    "quantity": ["quantity", "qty", "no. of items"],
-    "promotion": ["promotion", "promo discount", "special offer"],
-    "line_total": ["line total", "line amount", "subtotal per line"],
-    "line_tax_percentage": ["line tax percentage", "tax rate per item"],
-    "line_tax_amount": ["line tax amt", "line tax amount", "item tax"],
-    "line_sgst_rate": ["line sgst rate", "state tax rate per item"],
-    "line_sgst_amount": ["line sgst amount", "state tax amount per item"],
-    "line_igst_rate": ["line igst rate", "integrated tax rate per item"],
-    "line_igst_amount": ["line igst amount", "integrated tax amount per item"],
-    "line_hsn": ["line hsn", "line hsn code"],
-    "line_cgst_rate": ["line cgst rate", "central tax rate per item"],
-    "line_cgst_amount": ["line cgst amount", "central tax amount per item"],
-    "line_amount": ["line amount", "line item total"],
-    "description": ["description", "item description", "product details"],
-    "documentType": ["Document"]
-}
+csv_file = "extracted_batch_data.csv"
+
 doc_key_list = []
 def calculate_distance(bbox1, bbox2):
     """Calculate Euclidean distance between two bounding box centers."""
@@ -97,7 +51,12 @@ def preprocess_image(image_path):
     img = cv2.GaussianBlur(img, (5, 5), 0)
     _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return img
-   
+
+def analyze_text_with_ai(text, task="Give me the Invoice details"):
+    query = f"{task} this document:\n\n{text}"
+    response = ollama.chat(model="mistral", messages=[{"role": "user", "content": query}])
+    return response['message'] if response else "AI processing failed."
+ 
 def extract_text(image_path,doc_name,output_folder,keyMappingData):
     """Extracts text and bounding boxes from an image using PaddleOCR."""
     img = preprocess_image(image_path)
@@ -150,7 +109,6 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
             # text = word_info[1][0].strip() if isinstance(word_info[1][0], str) else str(word_info[1][0]) if isinstance(word_info[1][0], (float, int)) else word_info[1][0]
             confidence = word_info[1][1]  # Confidence score
             extracted_data.append((text, bbox, confidence))
-    
     return find_aligned_value(extracted_data, doc_key_list_array)
 
 def match_key(text, key_list, threshold=85):

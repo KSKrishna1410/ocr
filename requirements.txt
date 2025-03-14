@@ -1,4 +1,4 @@
-pymupdf
+# pymupdf
 fuzzywuzzy==0.18.0
 layoutparser==0.3.4
 numpy==2.2.3

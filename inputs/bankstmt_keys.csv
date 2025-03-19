@@ -1,14 +1,14 @@
 "field_name","key"
+Account Holder Name,Name
 Account Number,Account No
 Account Number,ACCOUNT NO
 Account Number,Account Number
 Account Number,Account Number -
 Account Number,Account Number - 
+Account Number,A/C No
 Account Number,Statement of Account No
 Account Number,Statement of Axis Account No
-Balance,BALANCE
-Balance,Balance(INR)
-Balance,Closing Balance
+Closing Balance,Closing Balance
 Bank Address1,BRANCH ADDRESS
 Bank Address2,BRANCH ADDRESS
 Bank Branch,Account Branch
@@ -17,32 +17,6 @@ Bank Branch,Branch
 Bank Branch,Branch Name
 Closing Balance,Closing Bal
 Closing Balance,CLOSING BALANCE
-Credit,CREDIT
-Credit,DEPOSIT
-Credit,Deposit Amt
-Credit,Deposit Amt.
-Credit,Deposit(Cr)
-Credit,DEPOSITS
-Credit,DR/CR
-Credit,Type
-Credit,Withdrawal (Dr)/ Deposit (Cr)
-Debit,DEBIT
-Debit,DR/CR
-Debit,Type
-Debit,Withdrawal Amt.
-Debit,Withdrawal (Dr)/ Deposit (Cr)
-Debit,Withdrawals
-Debit,Withdrawl (Dr)
-Debit,WITHDRAWS
-Description,Description
-Description,DESCRIPTION
-Description,NARATION
-Description,Narration
-Description,Particulars
-Description,Remarks
-Description,Transaction
-Description,Transaction Particulars
-Description,Transaction Remarks
 IFSC Code,AFSC
 IFSC Code,IFSC
 IFSC Code,IFSC Code
@@ -65,6 +39,7 @@ Statement Period From,Statement for the Period From
 Statement Period From,Statement From
 Statement Period From,STATEMENT PERIOD
 Statement Period From,STATEMENT PERIOD FROM
+Statement Period From,Transaction Date From
 Statement Period From,Transaction Period
 Statement Period To,Period
 Statement Period To,Period To
@@ -74,12 +49,5 @@ Statement Period To,STATEMENT PERIOD
 Statement Period To,STATEMENT PERIOD TO
 Statement Period To,Statement To
 Statement Period To,To
+Statement Period To,Transaction Date To
 Statement Period To,Transaction Period
-Transaction Date,DATE
-Transaction Date,Post Date
-Transaction Date,Tran Date
-Transaction Date,Transaction Date
-Transaction Date,Trans Date
-Transaction Date,Txn Date
-Value Date,VALUE DATE
-Value Date,Value Dt

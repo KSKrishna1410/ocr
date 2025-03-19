@@ -1,11 +1,12 @@
 import os
 import argparse
 from convert_pdftoImage import pdf2Image
-from getKeyValueResults import process_invoice
+from getKeyValueResults import process_document
 from generateKey_mapping import generate_key_mapping
 from mPgTableExtraction import runTabuleProcess_file
 import json
 import numpy as np
+from utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData
 
 # from identifyTableData import detectImage
 
@@ -16,12 +17,18 @@ import numpy as np
 def main(input_folder, output_folder, docType):
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
-    extracted_data = []
+    extracted_data = ""
     # Convert PDFs to images and get list of image paths
     keyMappingData = generate_key_mapping(docType);
     for index, file in enumerate(os.listdir(input_folder)):
         file_name = os.path.splitext(file)[0]  # Extract filename without extension
+        ifsc_code = None
+        bank_name = None
         print(f"Filename: {file_name}")  # Print or store it for further use
+        if file.lower().endswith((".jpg", ".jpeg", ".png",".pdf")):
+            image_paths = pdf2Image(input_folder, output_folder,file)
+        else:
+            continue
         image_paths = pdf2Image(input_folder, output_folder,file)
     
         if not image_paths:
@@ -40,7 +47,7 @@ def main(input_folder, output_folder, docType):
             page_file_name = os.path.splitext(os.path.basename(image_path))[0]
             # layoutOutput = detectImage(image_path,page_file_name,output_folder)
             
-            extracted_data = process_invoice(image_path,page_file_name,output_folder,keyMappingData)
+            extracted_data = process_document(image_path,page_file_name,output_folder,keyMappingData)
             base_name = os.path.splitext(os.path.basename(image_path))[0]  # Extract filename without extension
             output_path = os.path.join(output_folder, f"{base_name}.json")  # Save JSON in output folder
 
@@ -50,16 +57,31 @@ def main(input_folder, output_folder, docType):
             # Convert extractedData from string to list
             if isinstance(extracted_data, str):
                 extracted_data = json.loads(extracted_data)
+            if (docType == 'bankstmt'):
+                for item in extracted_data:
+                    if item.get("key") == "IFSC Code":
+                       ifsc_pattern = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
+                       ifsc_code = extract_first_match(item.get("value"), ifsc_pattern) or ifsc_code
+                       print('IFSC Code fetched is --------->  ', ifsc_code)
+                print("IFSC_Code not found")
             finalOutput["headerData"].append({
                 "page": index+1,
                 "extractedData": extracted_data
             })
             # print(f"✅ finalOutput after page:{index+1} and data is {finalOutput}")
             print(f"✅ JSON output saved: {output_path}")
+        if (docType == 'bankstmt' and ifsc_code != None):
+            print('Inside  Bankstmt fetch details----->')
+            bankDetails = get_bank_name(ifsc_code)
+            print('BankInfo  ----->', bankDetails)
+            bank_name = bankDetails.get("BANK")
+            saveBankInfo(bankDetails,file_name, output_folder)
         if file.lower().endswith(".pdf"):
             filepath = os.path.join(input_folder, file)
-            tableInfo = runTabuleProcess_file(output_folder,filepath,file)
-            finalOutput["lineTabulaData"] = tableInfo
+            tableInfo = runTabuleProcess_file(filepath)
+            if len(tableInfo) > 0:  
+                cleanedData = cleanTabulaData(output_folder,tableInfo,docType,file,bank_name)
+                finalOutput["lineTabulaData"] = cleanedData
         print('Complete Extracted code -------> ', tableInfo)
         finalJsonoutput_path = os.path.join(output_folder, f"{file_name}_final.json")
         # with open(finalJsonoutput_path, "w", encoding="utf-8") as json_file:

@@ -29,8 +29,8 @@ def pdf2Image(input_folder, output_folder, files):
         file_path = os.path.join(input_folder, normalized_pdf_name)
         
         # Rename PDF file if needed
-        if pdf_path != file_path:
-            os.rename(pdf_path, file_path)
+        # if pdf_path != file_path:
+        #     os.rename(pdf_path, file_path)
 
         print(f"📄 Processing PDF: {file_path}")
         images = convert_from_path(file_path, poppler_path=poppler_path)

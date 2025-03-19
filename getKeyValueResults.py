@@ -7,6 +7,7 @@ import json
 import math
 import os
 import csv
+from utilities import save_extracted_data
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
@@ -52,17 +53,17 @@ def preprocess_image(image_path):
     _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return img
 
-def analyze_text_with_ai(text, task="Give me the Invoice details"):
-    query = f"{task} this document:\n\n{text}"
-    response = ollama.chat(model="mistral", messages=[{"role": "user", "content": query}])
-    return response['message'] if response else "AI processing failed."
+# def analyze_text_with_ai(text, task="Give me the Invoice details"):
+#     query = f"{task} this document:\n\n{text}"
+#     response = ollama.chat(model="mistral", messages=[{"role": "user", "content": query}])
+#     return response['message'] if response else "AI processing failed."
  
 def extract_text(image_path,doc_name,output_folder,keyMappingData):
     """Extracts text and bounding boxes from an image using PaddleOCR."""
     img = preprocess_image(image_path)
     result = ocr.ocr(img, cls=True)
     rawtxtResult = result
-    print("\n🔹 PaddleOCR Raw Output:", result)
+    # print("\n🔹 PaddleOCR Raw Output:", result)
     if result is None or result == [None]:  # Handle empty or None result
         error_log_path = os.path.join(output_folder, "error_report.txt")
 
@@ -95,7 +96,7 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     # print(f"✅ OCR result saved at: {output_txt_path}")
     if not keyMappingData:  keyMappingData = key_mapping
     print('keyMappingData Generated: ', keyMappingData)
-    print("\n🔹 PaddleOCR Raw Output:", result)
+    # print("\n🔹 PaddleOCR Raw Output:", result)
     doc_key_list_array = getKeylist(result, keyMappingData)
     for key in doc_key_list_array:
         doc_key_list.append(key['key'])
@@ -226,46 +227,9 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
             })
     return key_value_pairs
 
-def save_extracted_data(extracted_data, output_folder, file_name):
-    """Saves extracted key-value pairs to a text file."""
-    # Ensure the output folder exists
-    os.makedirs(output_folder, exist_ok=True)
-
-    # # Create text output file path
-    # output_txt_path = os.path.join(output_folder, f"{file_name}_extracted_data.txt")
-
-    # try:
-    #     with open(output_txt_path, "w", encoding="utf-8") as f:
-    #         for obj in extracted_data:
-    #             f.write(f"{obj['key']} → {obj['value']}\n")
-
-    #     print(f"✅ Extracted data saved at: {output_txt_path}")
-
-    # except Exception as e:
-    #     print(f"❌ Error saving extracted data: {e}")
-
-    # Define the full path of the CSV file
-    csv_path = os.path.join(output_folder, csv_file)
-    # Check if the CSV file exists to determine if headers are needed
-    file_exists = os.path.isfile(csv_path)
-
-    try:
-        with open(csv_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            # Write headers only if the file is being created for the first time
-            if not file_exists:
-                writer.writerow(["File Name", "Key", "Value", "key_bbox", "value_bbox","method", "doc_text" ])  # CSV Headers
-            # Append extracted data
-            for obj in extracted_data:
-                writer.writerow([file_name, obj["key"], obj["value"], obj["key_bbox"], obj["value_bbox"],obj["method"], obj["doc_text"]])
-        print(f"✅ Data appended to CSV: {csv_path}")
-
-    except Exception as e:
-        print(f"❌ Error saving extracted data to CSV: {e}")
-
 ############################################################################################
 
-def process_invoice(image_path, doc_name, opfldr, keyMappingData):
+def process_document(image_path, doc_name, opfldr, keyMappingData):
     print('Inside Process function for Document' , doc_name)
     """Extracts key-value pairs from an invoice image."""
     extracted_data = extract_text(image_path, doc_name,opfldr,keyMappingData)
@@ -273,21 +237,6 @@ def process_invoice(image_path, doc_name, opfldr, keyMappingData):
     # json_output = generate_json_output(extracted_data)
     extracted_data = json.dumps(extracted_data, indent=4)
     return extracted_data
-
-
-
-# if __name__ == "__main__":
-
-#     # Right Aligned key_value
-#     # image_path = r"document/sree_cammphor_works-1.png"
-#     # image_path = r"document/iteminvoicedownload-11.png"
-#     # image_path = r"document/21.09.2024_shah_ghouse_hotel-1.png"
-#     # image_path = r"document/amazon_invoice_(1)-1.png"
-#     # image_path = r"document/13.05.2024__digital_track-1.png"
-    
-#     # Bottom Aligned key_value
-#     image_path = r"document/15.04.2024_global_technologies-1.png"
-#     process_invoice(image_path)
 
 def ProcessFile():
     print('Inside Process function')

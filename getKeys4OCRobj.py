@@ -54,18 +54,18 @@ def getKeylist(actual_ocr_output, key_mapping):
     for entry in actual_ocr_output[0]:
         bbox, (text, confidence) = entry
         text_lower = text.lower()
-        # print(f"text_lower '{text_lower}' variation_to_standard -> '{variation_to_standard}'")
         text_lower = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", text_lower.strip())
-        match = re.match(r"(.+?):\s*(.+)", text)
+        match = re.match(r"(.+?)\s*:\s*(.+)", text)
         # re.compile(r"([\w\s]+):\s*(.+)", re.IGNORECASE)
         if match:
+            ('colon_identification detect for ', text_lower)
             key, value = match.groups()  # Extract pre-text (key) and post-text (value)
             for matched_key in matched_keys:
                 if matched_key.get("key", "").lower() == key.lower():
                     matched_key["value"] = value
                     matched_key["key_bounding_box"] = str(bbox)
                     matched_key["method"]: 'colon_identification'
-                    # print(f"matched_key Bounding Box Assigned -> '{text}': {bbox}")
+                    print(f"matched_key Bounding Box Assigned -> '{text}': {bbox}")
             # matched_key_values = {"key": key.strip(), "value": value.strip()}  # Store in dictionary
         if text_lower in variation_to_standard:
             for matched_key in matched_keys:

@@ -18,7 +18,7 @@ dpi = 300
 zoom = dpi / 72
 # magnify = fitz.Matrix(zoom, zoom)
 
-def pdf2Image(input_folder, output_folder, files):
+def pdf2ImageMethod(input_folder, output_folder, files):
     print(f"📄 Processing File in Conversion method")
     os.makedirs(output_folder, exist_ok=True)
     image_paths = []  # List to store image paths

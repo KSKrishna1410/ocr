@@ -1,6 +1,6 @@
 import os
 import argparse
-from convert_pdftoImage import pdf2Image
+from convert_pdftoImage import pdf2ImageMethod
 from getKeyValueResults import process_document
 from generateKey_mapping import generate_key_mapping
 from mPgTableExtraction import runTabuleProcess_file
@@ -26,10 +26,10 @@ def main(input_folder, output_folder, docType):
         bank_name = None
         print(f"Filename: {file_name}")  # Print or store it for further use
         if file.lower().endswith((".jpg", ".jpeg", ".png",".pdf")):
-            image_paths = pdf2Image(input_folder, output_folder,file)
+            image_paths = pdf2ImageMethod(input_folder, output_folder,file)
         else:
             continue
-        image_paths = pdf2Image(input_folder, output_folder,file)
+        image_paths = pdf2ImageMethod(input_folder, output_folder,file)
     
         if not image_paths:
             print("❌ No images found for processing.")
@@ -70,6 +70,7 @@ def main(input_folder, output_folder, docType):
             })
             # print(f"✅ finalOutput after page:{index+1} and data is {finalOutput}")
             print(f"✅ JSON output saved: {output_path}")
+            # break 
         if (docType == 'bankstmt' and ifsc_code != None):
             print('Inside  Bankstmt fetch details----->')
             bankDetails = get_bank_name(ifsc_code)

@@ -6,11 +6,11 @@ import numpy as np
 
 csv_file = "key_pair_extracted_data.csv"
 bank_headers = {
-    "ICICI Bank": ["SrNo", "TranID", "ValueDate", "TransactionDate", "Chequeno/RefNo",
-                    "TransactionRemarks", "Withdrawl(Dr)", "Deposit(Cr)", "Balance"],
-    "AXIS": ["Txn Date", "Transaction", "Withdrawals", "Deposits", "Balance", "Other Information"],
-    "IDFC": ["TransactionDate", "Value Date", "Particulars", "ChequeNo", "Debit", "Credit", "Balance"],
-    "State Bank of India": ["Post Date", "Value Date", "Description", "ChequeNo/Reference", "Debit", "Credit", "Balance"]
+    "ICICI Bank": [["SrNo", "TranID", "ValueDate", "TransactionDate", "Chequeno/RefNo",
+                    "TransactionRemarks", "Withdrawl(Dr)", "Deposit(Cr)", "Balance"]],
+    "Axis Bank": [["Txn Date", "Transaction", "Withdrawals", "Deposits", "Balance", "Other Information"],["Tran Date", "Chq No", "Particulars", "Debit", "Credit", "Balance", "Init.Br"]],
+    "IDFC": [["TransactionDate", "Value Date", "Particulars", "ChequeNo", "Debit", "Credit", "Balance"]],
+    "State Bank of India": [["Post Date", "Value Date", "Description", "ChequeNo/Reference", "Debit", "Credit", "Balance"]]
 }
 
 # def getBankHeaders(bank_name):
@@ -82,11 +82,74 @@ def saveBankInfo(bankDetails,file_name,opfldr):
     save_extracted_data(filtered_data, opfldr, file_name)
     return 
 
-def is_header_row(row,expected_headers):
-    return sum(1 for keyword in expected_headers if any(keyword.lower() in str(cell).lower() for cell in row)) >= len(expected_headers) - 2
+def normalize(text):
+    """Convert text to lowercase and remove all spaces (before, after, and in between)."""
+    if isinstance(text, np.ndarray):  # Ensure text is a string
+        text = text.astype(str)  
+    return re.sub(r"\s+", "", text.strip().lower())
 
+# def is_header_row(row,expected_headers):
+#     return sum(1 for keyword in expected_headers if any(keyword.lower() in str(cell).lower() for cell in row)) >= len(expected_headers) - 2
+
+
+def is_header_row(row, expected_headers):
+    # Normalize expected headers
+    row = [normalize(row_items) for row_items in row]
+    expected_headers = [normalize(header_item) for header_item in expected_headers]
+    # Normalize row values before matching
+    return sum(
+        1 for keyword in expected_headers 
+        if any(keyword in normalize(str(cell)) for cell in row)
+    ) >= len(expected_headers) - 2
 
 def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
+    folderpath += "\\"
+    csv_output_path = folderpath+document+'TabulaData.csv'
+    data = []
+    expected_headers = bank_headers.get(bank_name, [])  # Return empty list if bank not found
+    print(f'Expected header -- {len(expected_headers)}  final_array[0] length --> {len(final_array[0])} and the final array is {final_array[0]}')
+    if (docType == 'bankstmt' and len(expected_headers) > 0):
+        matched_header_index = 0
+        header_index = None
+        # Find the header row index
+        # header_index = next((i for i, row in enumerate(final_array) if is_header_row(row, expected_headers)), None)
+        for i, row in enumerate(final_array):
+            for j, headers in enumerate(expected_headers):
+                print(f'Row Item -- {row}  Header fetch --> {headers}')
+                if is_header_row(row, headers):
+                    header_index = i  # Found header row index in final_array
+                    matched_header_index = j  # Found which expected_headers variation matched
+                    break  # Stop checking once a match is found
+            if header_index is not None:
+                break  # Stop the outer loop as well
+        
+        print(f'Header data and it index found at ----------------> {header_index} Matched expected_headers Index: {matched_header_index}')
+        expected_length = len(expected_headers[matched_header_index])  # Reference length
+        print(f"Matched expected_headers[matched_header_index]: {expected_headers[matched_header_index]}")
+        if header_index is not None:
+            final_array = final_array[header_index:]  # Keep from the header row onwards
+        else: print("❌ Error: Header row not found!")
+    else: 
+        expected_length = len(final_array[0])
+    # Convert existing data to a set for fast lookup
+    existing_rows = set(tuple(row) for row in data)  # Convert list to a set of tuples
+    with open(csv_output_path, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        print('Document getting saved at ',csv_output_path)
+        for eachrow in final_array:
+            eachrow = [" " if (isinstance(x, float) and np.isnan(x)) or x == "nan" else x for x in eachrow]
+            row_tuple = tuple(eachrow)  # Convert list to tuple for easy comparison
+            row_length = len(eachrow)  # Get row length
+            # print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
+            if row_tuple not in existing_rows and (expected_length - 1 <= row_length <= expected_length + 1):  # Check for duplicate and row lenght
+                writer.writerow(eachrow)  # Write to CSV
+                data.append(eachrow)  # Add to data list
+                existing_rows.add(row_tuple)  # Mark row as added
+            else:
+                print("🚨 Duplicate row skipped:", eachrow)
+    return data
+
+def cleanTabulaData_old(folderpath,final_array,docType, document, bank_name):
     csv_output_path = folderpath+document+'TabulaData.csv'
     data = []
     expected_headers = bank_headers.get(bank_name, [])  # Return empty list if bank not found
@@ -94,7 +157,10 @@ def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
     if (docType == 'bankstmt' and len(expected_headers) > 0):
         expected_length = len(expected_headers)  # Reference length
         # Find the header row index
-        header_index = next((i for i, row in enumerate(final_array) if is_header_row(row, expected_headers)), None)
+        header_index = next(
+            (i for i, row in enumerate(final_array) if any(is_header_row(row, headers) for headers in expected_headers)),
+            None
+        )
         print(f'Header data and it index found at ----------------> {header_index}')
         if header_index is not None:
             final_array = final_array[header_index:]  # Keep from the header row onwards
@@ -109,7 +175,7 @@ def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
             eachrow = [" " if (isinstance(x, float) and np.isnan(x)) or x == "nan" else x for x in eachrow]
             row_tuple = tuple(eachrow)  # Convert list to tuple for easy comparison
             row_length = len(eachrow)  # Get row length
-            print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
+            # print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
             if row_tuple not in existing_rows and (expected_length - 1 <= row_length <= expected_length + 1):  # Check for duplicate and row lenght
                 writer.writerow(eachrow)  # Write to CSV
                 data.append(eachrow)  # Add to data list

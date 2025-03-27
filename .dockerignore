@@ -1,0 +1,4 @@
+# Docker image archives or temp files
+*.tar.gz
+*.img
+*.iso

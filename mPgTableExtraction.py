@@ -5,6 +5,7 @@ import os
 import re
 import numpy as np
 import csv
+from utilities import cleanTabulaData
 # import pyPdf
 
 
@@ -71,18 +72,37 @@ def runTabuleProcess_file(filepath):
     final_array = []
     print('multi pafe data frame from Tabula count------> ', n)
     # if different pages have different areas from which data is to be extracted
+    pageData = readPdf4Page(filepath,'all')
+    if(len(pageData)>0):
+        print(f'Tabula All page captured output before cleaning-----> {pageData[0]}')
+        print('Data type of the pageDate' , pageData)
+        final_array.extend(pageData)
+    return final_array
+
+def runTabuleProcess_file_pageWise(filepath):
+    n = count_pdf_pages(filepath)
+    # n = 1
+    final_array = []
+    print('multi pafe data frame from Tabula count------> ', n)
+    # if different pages have different areas from which data is to be extracted
     for page in [str(i+1) for i in range(n)]:
         pageData = readPdf4Page(filepath,page)
-        final_array.extend(pageData)
-        # print(f'Tabula page {page} and captured output -----> {pageData}')
+        if(len(pageData)>0):
+            print(f'Tabula page {page} and captured output before cleaning-----> {pageData[0]}')
+            print('Data type of the pageDate' , pageData)
+            final_array.extend(pageData)
+        # print(f'Tabula page {page} and captured output -----> {fixed_pages}')
+        break
     return final_array
 
 def main():
-    folderpath = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\sysGen_Invoices"
-    # filepath = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\bank_tst\idfc_first_bank.pdf"
-    # file_name = os.path.splitext(os.path.basename(filepath))[0]
-    # runTabuleProcess_file(folderpath,filepath,file_name)
-    runTabuleProcess(folderpath)
+    folderpath = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\tabula_bank_stmt\test"
+    filepath = r"C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\tabula_bank_stmt\test\HDFC BANK.pdf"
+    file_name = os.path.splitext(os.path.basename(filepath))[0]
+    tableInfo = runTabuleProcess_file(filepath)
+    if len(tableInfo) > 0:  
+        cleanTabulaData(folderpath,tableInfo,'bankstmt',file_name,'IDFC')
+    # runTabuleProcess(folderpath)
     # print (file_name)
     
 # main()

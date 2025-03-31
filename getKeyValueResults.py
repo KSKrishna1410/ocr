@@ -8,6 +8,7 @@ import math
 import os
 import csv
 from utilities import save_extracted_data
+import statistics
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
@@ -82,14 +83,14 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
                 extracted_rawText.append({"text": text, "bbox": bbox})
     # print("\n🔹 PaddleOCR Raw Output:", result)
     output_txt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_result.txt")  # Save in output folder
-    output_rawtxt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_rawtxt.txt")  # Save in output folder
+    # output_rawtxt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_rawtxt.txt")  # Save in output folder
     
-    # To Save raw text in a file
-    with open(output_rawtxt_path, "w", encoding="utf-8") as f:
-        f.writelines(data["text"] + "\n" for data in extracted_rawText)  # Dump all text at once
-    print(f"Extracted text saved to: {output_rawtxt_path}")
+    # # To Save raw text in a file
+    # with open(output_rawtxt_path, "w", encoding="utf-8") as f:
+    #     f.writelines(data["text"] + "\n" for data in extracted_rawText)  # Dump all text at once
+    # print(f"Extracted text saved to: {output_rawtxt_path}")
 
-    # Save OCR result to a text file
+    # # Save OCR result to a text file
     with open(output_txt_path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=4, ensure_ascii=False)
 
@@ -148,10 +149,10 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
     keys.sort(key=lambda x: (x[1][0][1], x[1][0][0]))  # Sort by Y, then X
     values.sort(key=lambda x: (x[1][0][1], x[1][0][0]))
     bottom_tolerance = 20  # Adjust as needed
-    
     # Step 3: Matching the paired value for the given key
     key_value_pairs = []
     capturedMethod = None
+    print('key_info_list Values before Loop ---> ', key_info_list)
     for eachKey in key_info_list:
         key_text = eachKey['standard_key']
         if eachKey["key_bounding_box"] is not None and eachKey["value"] is None:
@@ -169,7 +170,8 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                 val_x2, val_y2 = val_bbox[1]  # Top-right of value
 
                 # Ensure value is on the right side and within Y tolerance
-                if val_x1 > key_x2 and abs(val_y1 - key_y1) <= y_tolerance:
+                average = statistics.mean([key_x1, key_x2])
+                if val_x1 > average and abs(val_y1 - key_y1) <= y_tolerance:
                     x_distance = val_x1 - key_x2  # Distance between key end and value start
 
                     if x_distance < min_x_distance:
@@ -178,7 +180,8 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                         closest_bbox = val_bbox
                         capturedMethod =  'right_aligned_pair'
                         closest_distance = calculate_distance(key_bbox, closest_bbox)
-                        if closest_value and closest_distance < 1200:
+                        print('Key value matched with the distance of ',closest_distance) 
+                        if closest_value and closest_distance < 1500:
                             # key_value_pairs[key_text] = {
                             #     "value": closest_value,
                             #     "key_bbox": key_bbox,

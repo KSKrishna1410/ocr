@@ -7,7 +7,7 @@ import numpy as np
 csv_file = "key_pair_extracted_data.csv"
 bank_headers = {
     "ICICI Bank": [["SrNo", "TranID", "ValueDate", "TransactionDate", "Chequeno/RefNo",
-                    "TransactionRemarks", "Withdrawl(Dr)", "Deposit(Cr)", "Balance"]],
+                    "TransactionRemarks", "Withdrawl(Dr)", "Deposit(Cr)", "Balance"],['DATE', 'MODE**', 'PARTICULARS', 'DEPOSITS', 'WITHDRAWALS', 'BALANCE']],
     "Axis Bank": [["Txn Date", "Transaction", "Withdrawals", "Deposits", "Balance", "Other Information"],["Tran Date", "Chq No", "Particulars", "Debit", "Credit", "Balance", "Init.Br"]],
     "IDFC": [["TransactionDate", "Value Date", "Particulars", "ChequeNo", "Debit", "Credit", "Balance"]],
     "State Bank of India": [["Post Date", "Value Date", "Description", "ChequeNo/Reference", "Debit", "Credit", "Balance"]]
@@ -84,9 +84,11 @@ def saveBankInfo(bankDetails,file_name,opfldr):
 
 def normalize(text):
     """Convert text to lowercase and remove all spaces (before, after, and in between)."""
-    if isinstance(text, np.ndarray):  # Ensure text is a string
-        text = text.astype(str)  
-    return re.sub(r"\s+", "", text.strip().lower())
+    if isinstance(text, np.ndarray):
+        text = text.astype(str)  # Convert NumPy array elements to string
+        text = " ".join(text)  # Join elements if it's an array
+
+    return re.sub(r"\s+", "", str(text).strip().lower())
 
 # def is_header_row(row,expected_headers):
 #     return sum(1 for keyword in expected_headers if any(keyword.lower() in str(cell).lower() for cell in row)) >= len(expected_headers) - 2
@@ -137,10 +139,14 @@ def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
         writer = csv.writer(file)
         print('Document getting saved at ',csv_output_path)
         for eachrow in final_array:
-            eachrow = [" " if (isinstance(x, float) and np.isnan(x)) or x == "nan" else x for x in eachrow]
+            # eachrow = [" " if (isinstance(x, float) and np.isnan(x)) or x == "nan" else x for x in eachrow]
+            eachrow = [
+                " " if (isinstance(x, float) and np.isnan(x)) or str(x).lower() == "nan" else x
+                for x in np.array(eachrow).flatten()  # Ensure eachrow is a list of values
+            ]
             row_tuple = tuple(eachrow)  # Convert list to tuple for easy comparison
             row_length = len(eachrow)  # Get row length
-            # print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
+            print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
             if row_tuple not in existing_rows and (expected_length - 1 <= row_length <= expected_length + 1):  # Check for duplicate and row lenght
                 writer.writerow(eachrow)  # Write to CSV
                 data.append(eachrow)  # Add to data list

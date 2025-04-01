@@ -8,11 +8,11 @@ import json
 
 
 # Get the current script directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-poppler_path = os.path.join(current_dir, "poppler-24.08.0", "Library", "bin")
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# poppler_path = os.path.join(current_dir, "poppler-24.08.0", "Library", "bin")
 # poppler_path = "/usr/bin"  # Poppler binaries are usually here
 # os.environ["PATH"] += os.pathsep + poppler_path
-print("Poppler Path:", poppler_path)
+# print("Poppler Path:", poppler_path)
 
 dpi = 300
 zoom = dpi / 72
@@ -33,7 +33,7 @@ def pdf2ImageMethod(input_folder, output_folder, files):
         #     os.rename(pdf_path, file_path)
 
         print(f"📄 Processing PDF: {file_path}")
-        images = convert_from_path(file_path, poppler_path=poppler_path)
+        images = convert_from_path(file_path)
         # images = fitz.open(file_path)
         base_name = os.path.splitext(normalized_pdf_name)[0]  # Extract normalized filename
 

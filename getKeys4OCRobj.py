@@ -1,78 +1,78 @@
+from difflib import SequenceMatcher
 import re
 
+def normalize(text):
+    return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
+
+def get_best_match(text, key_mapping, threshold=0.85):
+    best_score = 0
+    best_standard_key = None
+    best_variant = None
+
+    for standard_key, variants in key_mapping.items():
+        for variant in variants:
+            score = SequenceMatcher(None, normalize(text), normalize(variant)).ratio()
+            if score > best_score:
+                best_score = score
+                best_standard_key = standard_key
+                best_variant = variant
+    if best_score >= threshold:
+        return best_standard_key, best_variant
+    return None, None
+
 def getKeylist(actual_ocr_output, key_mapping):
-    """
-    Extracts detected keys and their bounding boxes from OCR output based on predefined key variations.
-
-    Parameters:
-        actual_ocr_output: OCR extracted data (list of tuples: (bbox, (text, confidence)))
-        key_mapping: Dictionary mapping standard keys to their possible variations
-
-    Returns:
-        List of matched key names and their bounding boxes.
-    """
     matched_keys = []
-    matched_keys_list = []
-    document_text_list = [entry[1][0].lower() for entry in actual_ocr_output[0]]
+    colon_matched_keys = []
+    direct_matched_keys = []
 
-    # document_text_list = []
-    # print('Entry from actual_ocr_output       ------->    ',actual_ocr_output )
-    # for entry in actual_ocr_output:
-    #     print('Entry from Actual OCR       ------->    ',entry )
-    #     if isinstance(entry[1][0], str):
-    #         document_text_list.append(entry[1][0].lower())
-    #     else:
-    #         document_text_list.append(entry[1][0])  # Assign as is if not a string
-    document_text_lower = "\n".join(document_text_list)  # Convert list to single string
+    text_entries = actual_ocr_output[0]  # Assuming a flat list of OCR output
 
-    # Preprocess key mapping into regex patterns
-    variation_to_standard = {}
-    regex_patterns = []
-    
-    for standard_key, variations in key_mapping.items():
-        for variant in variations:
-            pattern = rf"\b{re.escape(variant.lower())}\b"
-            regex_patterns.append((pattern, standard_key, variant))
-            variation_to_standard[variant.lower()] = standard_key
+    for bbox, (text, confidence) in text_entries:
+        normalized_text = normalize(text)
 
-    # Use regex to find all matches at once
-    for pattern, standard_key, variant in regex_patterns:
-        matches = re.finditer(pattern, document_text_lower)
-        
-        for match in matches:
-            matched_keys.append({
-                "key": variant,
-                "standard_key": standard_key,
-                "key_bounding_box": None,  # Will be assigned later
-                "value": None,
-                "value_bounding_box": None,
-                "method":None
-            })
-            # print(f"Matched '{variant}' -> '{standard_key}'")
+        # Handle colon-based key-value detection: key: value
+        colon_match = re.match(r"^\s*(.+?)\s*:\s*(.+?)\s*$", text)
+        if colon_match:
+            parts = text.split(':', 1)
+            key_part = parts[0].strip()
+            value_part = parts[1].strip()
 
-    # Map bounding boxes in one loop
-    for entry in actual_ocr_output[0]:
-        bbox, (text, confidence) = entry
-        text_lower = text.lower()
-        text_lower = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", text_lower.strip())
-        match = re.match(r"(.+?)\s*:\s*(.+)", text)
-        # re.compile(r"([\w\s]+):\s*(.+)", re.IGNORECASE)
-        if match:
-            ('colon_identification detect for ', text_lower)
-            key, value = match.groups()  # Extract pre-text (key) and post-text (value)
-            for matched_key in matched_keys:
-                if matched_key.get("key", "").lower() == key.lower():
-                    matched_key["value"] = value
-                    matched_key["key_bounding_box"] = str(bbox)
-                    matched_key["method"]: 'colon_identification'
-                    print(f"matched_key Bounding Box Assigned -> '{text}': {bbox}")
-            # matched_key_values = {"key": key.strip(), "value": value.strip()}  # Store in dictionary
-        if text_lower in variation_to_standard:
-            for matched_key in matched_keys:
-                if matched_key["key"].lower() == text_lower and matched_key["key_bounding_box"] is None:
-                    matched_key["key_bounding_box"] = str(bbox)
-                    break
-    for matched_key in matched_keys:
-        matched_keys_list.append(f"{matched_key['key']} -- {matched_key['standard_key']}")
-    print(f"🔹 🔹 🔹 matched_keys_list '{matched_keys_list}'")
+            standard_key, variant = get_best_match(key_part, key_mapping)
+            if standard_key:
+                matched_keys.append({
+                    "key": variant,
+                    "standard_key": standard_key,
+                    "key_bounding_box": str(bbox),
+                    "value": value_part,
+                    "value_bounding_box": None,
+                    "method": "colon_identification"
+                })
+                colon_matched_keys.append(variant)
+                print(f"[COLON DETECTED] Matched: '{key_part}' -> '{standard_key}' | Value: '{value_part}'")
+        else:
+            # Try to match individual text without a colon (e.g., keys in isolation)
+            standard_key, variant = get_best_match(text, key_mapping)
+            if standard_key:
+                existing_entry = next((k for k in matched_keys if k["key"] == variant), None)
+                if not existing_entry:
+                    matched_keys.append({
+                        "key": variant,
+                        "standard_key": standard_key,
+                        "key_bounding_box": str(bbox),
+                        "value": None,
+                        "value_bounding_box": None,
+                        "method": "direct_match"
+                    })
+                    direct_matched_keys.append(variant)
+                    print(f"[DIRECT MATCH] Key-only matched: '{text}' -> '{standard_key}'")
+
+    # Summary debug logs
+    print("\n🔹 Colon-based Matched Keys:")
+    for key in colon_matched_keys:
+        print(f"  ➤ {key}")
+
+    print("\n🔸 Direct Matched Keys (No value yet):")
+    for key in direct_matched_keys:
+        print(f"  ➤ {key}")
+
     return matched_keys

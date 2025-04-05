@@ -43,7 +43,7 @@ def extract_first_match(text, pattern):
 
 def save_extracted_data(extracted_data, output_folder, file_name):
     """Saves extracted key-value pairs to a text file."""
-    print('Inside CSV printing ----->   ', extracted_data)
+    # print('Inside CSV printing ----->   ', extracted_data)
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
     csv_path = os.path.join(output_folder, csv_file)
@@ -55,7 +55,7 @@ def save_extracted_data(extracted_data, output_folder, file_name):
             writer = csv.writer(f)
             # Write headers only if the file is being created for the first time
             if not file_exists:
-                writer.writerow(["File Name", "Key", "Value", "key_bbox", "value_bbox","method", "doc_text" ])  # CSV Headers
+                writer.writerow(["File Name", "Key", "Value","method", "key_bbox", "value_bbox", "doc_text" ])  # CSV Headers
             # Append extracted data
             for obj in extracted_data:
                 # writer.writerow([file_name, obj["key"], obj["value"], obj["key_bbox"], obj["value_bbox"],obj["method"], obj["doc_text"]])
@@ -63,9 +63,9 @@ def save_extracted_data(extracted_data, output_folder, file_name):
                     file_name,
                     obj.get("key", ""),
                     obj.get("value", ""),
+                    obj.get("method", ""),
                     obj.get("key_bbox", ""),
                     obj.get("value_bbox", ""),
-                    obj.get("method", ""),
                     obj.get("doc_text", "")
                 ])
         print(f"✅ Data appended to CSV: {csv_path}")
@@ -147,7 +147,8 @@ def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
             row_tuple = tuple(eachrow)  # Convert list to tuple for easy comparison
             row_length = len(eachrow)  # Get row length
             print(f'expected_length but got {expected_length} and  rowlenght {row_length}')
-            if row_tuple not in existing_rows and (expected_length - 1 <= row_length <= expected_length + 1):  # Check for duplicate and row lenght
+            if row_tuple not in existing_rows :  # Check for duplicate and row lenght
+            # if row_tuple not in existing_rows and (expected_length - 1 <= row_length <= expected_length + 1):  # Check for duplicate and row lenght
                 writer.writerow(eachrow)  # Write to CSV
                 data.append(eachrow)  # Add to data list
                 existing_rows.add(row_tuple)  # Mark row as added

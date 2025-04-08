@@ -1,9 +1,15 @@
 # pymupdf
-fuzzywuzzy==0.18.0
-layoutparser==0.3.4
-numpy==2.2.3
-paddleocr==2.9.1
-pandas==2.2.1
-pdf2image==1.17.0
-Pillow==11.1.0
-tabula_py==2.10.0
+fuzzywuzzy
+layoutparser
+numpy
+paddleocr
+pandas
+pdf2image
+Pillow
+tabula_py
+paddlepaddle
+setuptools
+# pip install fastapi uvicorn psycopg2
+python-multipart
+python-dotenv
+paramiko

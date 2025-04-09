@@ -50,6 +50,6 @@ RUN . /app/ppenv/bin/activate && \
 COPY . .
 
 RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
-RUN "uvicorn main_api:app"
+RUN "uvicorn main_api:app --port 8888"
 
 CMD ["tail", "-f", "/dev/null"]

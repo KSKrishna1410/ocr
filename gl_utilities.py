@@ -299,3 +299,50 @@ def upload_to_sftp(file_content: bytes, filename: str, remote_dir) -> str:
         return remote_path
     except Exception as e:
         raise RuntimeError(f"SFTP Upload Failed: {e}")
+    
+def download_from_sftp(remote_filepath: str, local_filepath: str) -> None:
+    SFTP_HOST = os.getenv("SFTP_HOST")
+    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
+    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+
+    try:
+        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        try:
+            sftp.get(remote_filepath, local_filepath)
+        except Exception as e:
+            raise RuntimeError(f"Failed to download file from '{remote_filepath}': {e}")
+
+        sftp.close()
+        transport.close()
+
+    except Exception as e:
+        raise RuntimeError(f"SFTP Download Failed: {e}")
+    
+def read_file_from_sftp(remote_filepath: str) -> bytes:
+    SFTP_HOST = os.getenv("SFTP_HOST")
+    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
+    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+
+    try:
+        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        try:
+            with sftp.file(remote_filepath, "rb") as remote_file:
+                content = remote_file.read()
+        except Exception as e:
+            raise RuntimeError(f"Failed to read file from '{remote_filepath}': {e}")
+        finally:
+            sftp.close()
+            transport.close()
+
+        return content
+
+    except Exception as e:
+        raise RuntimeError(f"SFTP Read Failed: {e}")

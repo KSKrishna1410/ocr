@@ -15,12 +15,12 @@ from fastapi import FastAPI, File, UploadFile, Form # type: ignore
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from uuid import uuid4
-from typing import Optional
+from typing import Optional, Literal
 
 
 from gl_convert_pdftoImage import pdf2ImageMethod
 from gl_getKeyValueResults import process_document
-from generateKey_mapping import generate_key_mapping
+from generateKey_mapping import generate_key_mapping_remote
 from gl_mPgTableExtraction import runTabuleProcess_file
 from gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp, cleanTabulaData
 
@@ -31,12 +31,11 @@ app = FastAPI()
 TEMP_DIR = "temp_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-@app.post("/process-file/")
-async def process_file(
+@app.post("/ocr_process/")
+async def ocr_process_file(
     file: UploadFile = File(...),
-    output_path: str = Form(...),
-    doctype: str = Form(...),
-    input_folder: Optional[str] = Form(None)
+    doctype: Literal["invoice", "bankstmt"] = Form(...)
+    # input_folder: Optional[str] = Form(None)
 ):
     try:
         # Create a unique filename
@@ -50,7 +49,7 @@ async def process_file(
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        file_id = str(uuid.uuid4())
+        # file_id = str(uuid.uuid4())
         print(f"Filename: {file.filename} and the file path {temp_file_path}")  # Print or store it for further use
         ocrObject = processOcr(temp_dir, doctype,temp_file_name,uniqueId)
         cleaned_ocrObject = convert_ndarray(ocrObject)
@@ -84,12 +83,12 @@ def processOcr(folder_path, docType, file,uniqueId):
     print(f"📂 Inside main function:")
     extracted_data = ""
     remote_path = ""
-    
-    keyMappingData = generate_key_mapping(docType)
-    file_name = os.path.splitext(file)[0]
     ifsc_code = None
     bank_name = None
+    file_name = os.path.splitext(file)[0]
+    
     remote_dir = prepareRemotePath(file_name,uniqueId)
+    keyMappingData = generate_key_mapping_remote(docType)
 
     file_path = os.path.join(folder_path, file)
     print(f"📄 Filename: {file_name}")
@@ -114,6 +113,7 @@ def processOcr(folder_path, docType, file,uniqueId):
     print(f"✅ Found {len(image_paths)} images. Processing...")
 
     finalOutput = {
+        "processId": uniqueId,
         "filePath": remote_path,
         "fileDir": remote_dir,
         "document_type": docType.upper(),

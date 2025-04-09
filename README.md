@@ -19,6 +19,11 @@ Ensure you have **Python 3.7+** installed. Install the required dependencies usi
 pip install -r requirements.txt
 ```
 
+OR
+```bash
+pip install paddleocr fuzzywuzzy layoutparser pandas paddlepaddle tabula_py
+```
+
 ### Required Packages
 The project relies on the following key libraries:
 - **paddleocr** - For Optical Character Recognition (OCR)
@@ -75,4 +80,8 @@ This project is licensed under the **MIT License**.
 
 # python .\main.py "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\inputs" "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\inputs\images"
 
-
+uvicorn main_api:app --host 0.0.0.0 --port 8763 --reload
+Optional Installation
+pip install --upgrade albumentations albucore
+pip install setuptools
+pip install py-eureka-client

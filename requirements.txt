@@ -9,6 +9,8 @@ Pillow
 tabula_py
 paddlepaddle
 setuptools
+fastapi
+uvicorn
 # pip install fastapi uvicorn psycopg2
 python-multipart
 python-dotenv

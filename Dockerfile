@@ -45,5 +45,6 @@ RUN . /app/ppenv/bin/activate && \
 COPY . .
 
 RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
+RUN uvicorn main_api:app
 
 CMD ["tail", "-f", "/dev/null"]

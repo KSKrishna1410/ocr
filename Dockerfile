@@ -39,7 +39,12 @@ RUN . /app/ppenv/bin/activate && \
         fuzzywuzzy \
         pandas \
         pillow \
-        tabula-py
+        tabula-py \
+        fastapi \
+        uvicorn \
+        python-multipart \
+        python-dotenv \
+        paramiko
 
 # Copy project files
 COPY . .

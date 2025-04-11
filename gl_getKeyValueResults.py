@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCR, draw_ocr
 from fuzzywuzzy import fuzz, process  
 from getKeys4OCRobj import *
 import json
@@ -9,6 +9,9 @@ import os
 import csv
 from gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
 import statistics
+from tableMarkingDetection import OCRBoxDrawer, TableDetector
+from PIL import Image
+# from gl_mistral import analyze_text_with_ai
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
@@ -94,6 +97,38 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     upload_to_sftp(ocr_json_content, ocr_result_file, output_folder)
     print(f"✅ OCR result JSON uploaded to SFTP: {ocr_result_file}")
     
+    image = Image.open(image_path).convert('RGB')
+    boxes = []
+    txts = []
+    scores = []
+
+    # Flatten the result list properly
+    for line in result[0]:  # PaddleOCR returns a list of pages; use result[0] for single page
+        box = line[0]
+        (text, score) = line[1]
+        boxes.append(box)
+        txts.append(text)
+        scores.append(score)
+    im_show = draw_ocr(image, boxes, txts, scores, font_path='/home/nspl/glbyte_ocr/simfang.ttf')
+    im_show = Image.fromarray(im_show)
+    im_show.save(f"{doc_name}_annotated_img_result.jpg")
+    with open(f"{doc_name}_annotated_img_result.jpg", 'rb') as f:
+        ocr_image_content = f.read()
+    upload_to_sftp(ocr_image_content, f"{doc_name}_annotated_img_result.jpg", output_folder)
+    flattened_result = [item for sublist in result for item in sublist]
+    output_image = f"{doc_name}_annotated.png"
+    drawer = OCRBoxDrawer(image_path, flattened_result)
+    image_with_boxes = drawer.draw_boxes()
+        # Step 2: Highlight table region
+    table_detector = TableDetector(flattened_result)
+    image_with_table = table_detector.draw_table_box(image_with_boxes)
+    # Step 3: Save the output image
+    drawer.save_image(output_image)
+    with open(output_image, 'rb') as f:
+        image_content = f.read()
+    upload_to_sftp(image_content, output_image, output_folder)
+    
+
     
     # output_txt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_result.txt")  # Save in output folder
     # output_rawtxt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_rawtxt.txt")  # Save in output folder

@@ -21,12 +21,12 @@ def pdf2ImageMethod(input_folder, remote_dir, output_folder, file):
     image_paths = []  # List to store image paths
 
     if file.lower().endswith(".pdf"):
-        normalized_pdf_name = file.replace(" ", "_").lower()
-        file_path = os.path.join(input_folder, normalized_pdf_name)
-
+        # normalized_pdf_name = file.replace(" ", "_").lower()
+        # file_path = os.path.join(input_folder, normalized_pdf_name)
+        file_path = os.path.join(input_folder, file)
         print(f"📄 Processing PDF: {file_path}")
-        images = convert_from_path(file_path, poppler_path=poppler_path)
-        base_name = os.path.splitext(normalized_pdf_name)[0]
+        images = convert_from_path(file_path)
+        base_name = os.path.splitext(file)[0]
 
         for page_num, image in enumerate(images, start=1):
             buffer = BytesIO()

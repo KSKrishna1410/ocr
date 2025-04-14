@@ -44,7 +44,7 @@ RUN . /app/ppenv/bin/activate && \
         uvicorn \
         python-multipart \
         python-dotenv \
-        paramiko  && \
+        paramiko 
 
 # Copy project files
 COPY . .

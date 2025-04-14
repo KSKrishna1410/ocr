@@ -9,6 +9,7 @@ import pandas as pd
 import time
 import traceback
 import sys
+import logging
 
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile, Form # type: ignore
@@ -24,7 +25,18 @@ from generateKey_mapping import generate_key_mapping_remote
 from gl_mPgTableExtraction import runTabuleProcess_file
 from gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp, cleanTabulaData
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("glByte InHouse OCR Application is starting up...")
+
+@app.get("/")
+async def root():
+    return {"message": "Hello from FastAPI!"}
 
 
 # Ensure temp directory exists

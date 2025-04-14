@@ -12,11 +12,13 @@ import sys
 import logging
 
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile, Form # type: ignore
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, UploadFile,Request, Form # type: ignore
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
 from uuid import uuid4
 from typing import Optional, Literal
+from pathlib import Path
 
 
 from gl_convert_pdftoImage import pdf2ImageMethod
@@ -30,14 +32,16 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# Path to your templates folder
+templates = Jinja2Templates(directory="templates")
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("glByte InHouse OCR Application is starting up...")
 
-@app.get("/")
-async def root():
-    return {"message": "Hello from FastAPI!"}
-
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 # Ensure temp directory exists
 TEMP_DIR = "temp_uploads"

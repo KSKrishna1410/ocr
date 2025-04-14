@@ -197,51 +197,105 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                         capturedMethod = 'right_aligned_pair'
                         closest_distance = calculate_distance(key_bbox, closest_bbox)
                         print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance)
+                        existing_index = next((i for i, kv in enumerate(key_value_pairs) if kv["key"] == key_text), None)
                         for threshold in range(100, 1601, 100):
                             if closest_value and closest_distance < threshold:
-                                key_value_pairs.append({
-                                    "key": key_text,
-                                    "value": closest_value,
-                                    "key_bbox": key_bbox,
-                                    "value_bbox": closest_bbox,
-                                    "method": capturedMethod,
-                                    "doc_text": eachKey['key'],
-                                    "closest_distance": closest_distance
-                                })
-                                used_value_bboxes.append(closest_bbox)
-                                print(f"[RIGHT] Matched {key_text} --> {closest_value} within threshold {threshold}: Distance = {closest_distance}")
-                                break
+                                if existing_index is None:
+                                    key_value_pairs.append({
+                                        "key": key_text,
+                                        "value": closest_value,
+                                        "key_bbox": key_bbox,
+                                        "value_bbox": closest_bbox,
+                                        "method": capturedMethod,
+                                        "doc_text": eachKey['key'],
+                                        "closest_distance": closest_distance
+                                    })
+                                    used_value_bboxes.append(closest_bbox)
+                                    print(f"[RIGHT] Matched {key_text} --> {closest_value} within threshold {threshold}: Distance = {closest_distance}")
+                                    break
+                                else:
+                                    # If it exists, only replace if new distance is smaller
+                                    existing_distance = key_value_pairs[existing_index]["closest_distance"]
+                                    if closest_distance < existing_distance:
+                                        # Replace the existing entry
+                                        key_value_pairs[existing_index] = {
+                                            "key": key_text,
+                                            "value": closest_value,
+                                            "key_bbox": key_bbox,
+                                            "value_bbox": closest_bbox,
+                                            "method": capturedMethod,
+                                            "doc_text": eachKey['key'],
+                                            "closest_distance": closest_distance
+        }
+
+            # Bottom aligned matching with gradual bottom_tolerance Tolerance method
+            # for bottom_tolerance in range(10, 51, 10):
+            #     for val_text, val_bbox in values:
+            #         if val_bbox in used_value_bboxes:
+            #             continue  # Skip reused values
+            #         val_x1, val_y1 = val_bbox[0]
+            #         if (key_y3 < val_y1 <= key_y3 + bottom_tolerance) and (key_x1 - bottom_tolerance <= val_x1 <= key_x2):
+            #             y_distance = val_y1 - key_y3
+            #             if y_distance < min_y_distance:
+            #                 min_y_distance = y_distance
+            #                 closest_value = val_text
+            #                 closest_bbox = val_bbox
+            #                 capturedMethod = 'bottom_aligned_pair'
+            #                 closest_distance = calculate_distance(key_bbox, closest_bbox)
+            #                 print(f"Bottom-aligned match candidate for {key_text} --> {val_text} at tolerance {bottom_tolerance}: Distance = {closest_distance}")
+            #                 if closest_value and closest_distance < bottom_tolerance:
+            #                     key_value_pairs.append({
+            #                         "key": key_text,
+            #                         "value": closest_value,
+            #                         "key_bbox": key_bbox,
+            #                         "value_bbox": closest_bbox,
+            #                         "method": capturedMethod,
+            #                         "doc_text": eachKey['key'],
+            #                         "closest_distance": closest_distance
+            #                     })
+            #                     used_value_bboxes.append(closest_bbox)
+            #                     break  # Stop once matched within a tolerance
+            #     else:
+            #         continue  # Continue outer loop only if inner did not break
+            #     break  # Break outer loop if matched
 
             # Bottom aligned matching with gradual bottom_tolerance
-            for bottom_tolerance in range(10, 51, 10):
-                for val_text, val_bbox in values:
-                    if val_bbox in used_value_bboxes:
-                        continue  # Skip reused values
-                    val_x1, val_y1 = val_bbox[0]
-                    if (key_y3 < val_y1 <= key_y3 + bottom_tolerance) and (key_x1 - bottom_tolerance <= val_x1 <= key_x2):
-                        y_distance = val_y1 - key_y3
-                        if y_distance < min_y_distance:
-                            min_y_distance = y_distance
-                            closest_value = val_text
-                            closest_bbox = val_bbox
-                            capturedMethod = 'bottom_aligned_pair'
-                            closest_distance = calculate_distance(key_bbox, closest_bbox)
-                            print(f"Bottom-aligned match candidate for {key_text} --> {val_text} at tolerance {bottom_tolerance}: Distance = {closest_distance}")
-                            if closest_value and closest_distance < bottom_tolerance:
-                                key_value_pairs.append({
-                                    "key": key_text,
-                                    "value": closest_value,
-                                    "key_bbox": key_bbox,
-                                    "value_bbox": closest_bbox,
-                                    "method": capturedMethod,
-                                    "doc_text": eachKey['key'],
-                                    "closest_distance": closest_distance
-                                })
-                                used_value_bboxes.append(closest_bbox)
-                                break  # Stop once matched within a tolerance
-                else:
-                    continue  # Continue outer loop only if inner did not break
-                break  # Break outer loop if matched
+            actual_bottom_threshold = 60  # Define your bottom threshold
+            match_found = False
+            match_candidates = []
+            for val_text, val_bbox in values:
+                if val_bbox in used_value_bboxes:
+                    continue  # Skip reused values
+
+                val_x1, val_y1 = val_bbox[0]
+
+                if (key_y3 < val_y1 <= key_y3 + actual_bottom_threshold) and (key_x1 - actual_bottom_threshold <= val_x1 <= key_x2):
+                    print(f"[Bottom] initiating Bottom Method {key_text} --> {val_text}")
+                    y_distance = val_y1 - key_y3
+                    print(f"[Y Distance] in Bottom Method {y_distance} and the min_y_dist {min_y_distance}")
+
+                    if y_distance < min_y_distance:
+                        min_y_distance = y_distance
+                        closest_value = val_text
+                        closest_bbox = val_bbox
+                        capturedMethod = 'bottom_aligned_pair'
+                        closest_distance = calculate_distance(key_bbox, closest_bbox)
+                        print(f"Bottom-aligned match candidate for {key_text} --> {val_text}: Distance = {closest_distance}")
+
+                        if closest_value and closest_distance < actual_bottom_threshold:
+                            key_value_pairs.append({
+                                "key": key_text,
+                                "value": closest_value,
+                                "key_bbox": key_bbox,
+                                "value_bbox": closest_bbox,
+                                "method": capturedMethod,
+                                "doc_text": eachKey['key'],
+                                "closest_distance": closest_distance
+                            })
+                            print(f"✅ Bottom KVP-aligned match for {key_text} --> {val_text}")
+                            used_value_bboxes.append(closest_bbox)
+                            match_found = True
+                            break  # Stop checking once a valid match is found
 
         elif eachKey["value"] is not None:
             print(f"Colon match used for: '{key_text}'")

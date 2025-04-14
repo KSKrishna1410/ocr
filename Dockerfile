@@ -52,5 +52,5 @@ COPY . .
 RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
 #RUN "uvicorn main_api:app --port 8888"
 # Default command to run the FastAPI app
-CMD ["/app/ppenv/bin/uvicorn", "main_api:app", "--host", "192.168.0.103", "--port", "8888", "--log-level", "info"]
+CMD ["/app/ppenv/bin/uvicorn", "main_api:app", "--host", "devmct_ocr", "--port", "8888", "--log-level", "info"]
 CMD ["tail", "-f", "/dev/null"]

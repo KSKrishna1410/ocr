@@ -34,8 +34,7 @@ RUN . /app/ppenv/bin/activate && \
 #    pip install -r requirements.txt	
     pip install \
 	paddlepaddle \
-        paddleocr && \
-        python3 -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)" \
+        paddleocr \
         pdf2image \
         fuzzywuzzy \
         pandas \

@@ -1,5 +1,5 @@
 FROM python:3.10-bullseye
-
+ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -53,4 +53,4 @@ RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
 #RUN "uvicorn main_api:app --port 8888"
 # Default command to run the FastAPI app
 CMD ["/app/ppenv/bin/uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "8888", "--log-level", "debug"]
-CMD ["tail", "-f", "/dev/null"]
+#CMD ["tail", "-f", "/dev/null"]

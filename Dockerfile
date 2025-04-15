@@ -1,5 +1,5 @@
 FROM python:3.10-bullseye
-
+ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,11 +39,19 @@ RUN . /app/ppenv/bin/activate && \
         fuzzywuzzy \
         pandas \
         pillow \
-        tabula-py
+        tabula-py \
+        fastapi \
+        uvicorn \
+        python-multipart \
+        python-dotenv \
+        paramiko \
+        jinja2
 
 # Copy project files
 COPY . .
 
 RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
-
-CMD ["tail", "-f", "/dev/null"]
+#RUN "uvicorn main_api:app --port 8888"
+# Default command to run the FastAPI app
+CMD ["/app/ppenv/bin/uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "8888", "--log-level", "debug"]
+#CMD ["tail", "-f", "/dev/null"]

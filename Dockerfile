@@ -44,7 +44,8 @@ RUN . /app/ppenv/bin/activate && \
         uvicorn \
         python-multipart \
         python-dotenv \
-        paramiko 
+        paramiko \
+        jinja2
 
 # Copy project files
 COPY . .

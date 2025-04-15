@@ -25,7 +25,7 @@ def pdf2ImageMethod(input_folder, remote_dir, output_folder, file):
         # file_path = os.path.join(input_folder, normalized_pdf_name)
         file_path = os.path.join(input_folder, file)
         print(f"📄 Processing PDF: {file_path}")
-        images = convert_from_path(file_path)
+        images = convert_from_path(file_path, poppler_path=poppler_path)
         base_name = os.path.splitext(file)[0]
 
         for page_num, image in enumerate(images, start=1):

@@ -4,20 +4,33 @@ import re
 def normalize(text):
     return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
 
-def get_best_match(text, key_mapping, threshold=0.85):
-    best_score = 0
-    best_standard_key = None
-    best_variant = None
 
+def get_best_match(text, key_mapping, threshold=0.85):
+    normalized_text = normalize(text)
+
+    # Step 1: Try exact match first
     for standard_key, variants in key_mapping.items():
         for variant in variants:
-            score = SequenceMatcher(None, normalize(text), normalize(variant)).ratio()
-            if score > best_score:
-                best_score = score
-                best_standard_key = standard_key
-                best_variant = variant
-    if best_score >= threshold:
-        return best_standard_key, best_variant
+            if normalize(variant) == normalized_text:
+                # print(f"Exact Match record ------> normalized_text {normalized_text} and the variant is {variant}" )
+                return standard_key, variant
+
+    # Step 2: Fallback to best fuzzy match
+    # best_score = 0
+    # best_standard_key = None
+    # best_variant = None
+
+    # for standard_key, variants in key_mapping.items():
+    #     for variant in variants:
+    #         score = SequenceMatcher(None, normalized_text, normalize(variant)).ratio()
+    #         if score > best_score:
+    #             best_score = score
+    #             best_standard_key = standard_key
+    #             best_variant = variant
+
+    # if best_score >= threshold:
+    #     return best_standard_key, best_variant
+
     return None, None
 
 def getKeylist(actual_ocr_output, key_mapping):

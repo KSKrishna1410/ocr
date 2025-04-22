@@ -45,7 +45,8 @@ RUN . /app/ppenv/bin/activate && \
         python-multipart \
         python-dotenv \
         paramiko \
-        jinja2
+        jinja2 \
+        PyPDF2
 
 # Copy project files
 COPY . .

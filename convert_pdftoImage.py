@@ -9,7 +9,7 @@ import json
 
 # Get the current script directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
-poppler_path = os.path.join(current_dir, "poppler-24.08.0", "Library", "bin")
+poppler_path = os.path.join(current_dir, "static/poppler-24.08.0", "Library", "bin")
 # poppler_path = "/usr/bin"  # Poppler binaries are usually here
 # os.environ["PATH"] += os.pathsep + poppler_path
 print("Poppler Path:", poppler_path)

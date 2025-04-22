@@ -346,3 +346,19 @@ def read_file_from_sftp(remote_filepath: str) -> bytes:
 
     except Exception as e:
         raise RuntimeError(f"SFTP Read Failed: {e}")
+
+def read_file_from_sftpFldr(remote_path: str) -> bytes:
+    SFTP_HOST = os.getenv("SFTP_HOST")
+    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
+    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+    try:
+        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        # List files in remote directory
+        remote_files = sftp.listdir(remote_path)
+        return remote_files
+    except Exception as e:
+        return {"error": str(e)}

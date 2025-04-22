@@ -16,3 +16,4 @@ python-multipart
 python-dotenv
 paramiko
 jinja2
+PyPDF2

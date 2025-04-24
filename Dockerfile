@@ -7,6 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     ca-certificates
 
+ADD entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+CMD /entrypoint.sh
+    
 # Add your further install logic below (e.g., tesseract, pip packages, etc.)
 
 # Install system dependencies
@@ -45,7 +49,8 @@ RUN . /app/ppenv/bin/activate && \
         python-multipart \
         python-dotenv \
         paramiko \
-        jinja2
+        jinja2 \
+        PyPDF2
 
 # Copy project files
 COPY . .

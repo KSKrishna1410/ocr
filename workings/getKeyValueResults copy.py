@@ -11,14 +11,7 @@ from utilities import save_extracted_data
 import statistics
 
 # Initialize OCR with enhanced settings
-ocr = PaddleOCR(use_angle_cls=True, lang='en', 
-                rec_algorithm='CRNN', det_db_box_thresh=0.5, 
-                det=True,
-                rec=True,
-                structure=True,
-                show_log=True,
-                structure_version='PP-StructureV2',  # 👈 REQUIRED for SLANet
-                table_model_dir='/home/nspl/glbyte_ocr/tablemodel/slanet')
+ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
 csv_file = "extracted_batch_data.csv"
 
 doc_key_list = []
@@ -69,7 +62,7 @@ def preprocess_image(image_path):
 def extract_text(image_path,doc_name,output_folder,keyMappingData):
     """Extracts text and bounding boxes from an image using PaddleOCR."""
     img = preprocess_image(image_path)
-    result = ocr.ocr(img, cls=True, structure=True)
+    result = ocr.ocr(img, cls=True)
     rawtxtResult = result
     # print("\n🔹 PaddleOCR Raw Output:", result)
     if result is None or result == [None]:  # Handle empty or None result
@@ -137,134 +130,101 @@ def get_x_y_positions(bbox):
     return key_end_x, top_y
 
 def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
-    """Finds key-value pairs where the value is directly to the right of the key or just below it."""
-    import statistics, json
-
+    """Finds key-value pairs where the value is directly to the right of the key."""
     keys = []
     values = []
-
+    
     # Step 1: Categorize extracted text into keys and values
     for entry in extracted_data:
         text, bbox, confidence = entry
+    
+        # Find if the extracted text matches any key
         matched_key_entry = next((key_entry for key_entry in key_info_list if key_entry["key"].lower() == text.lower()), None)
         if matched_key_entry and matched_key_entry["key_bounding_box"]:
             keys.append((matched_key_entry["standard_key"], eval(matched_key_entry["key_bounding_box"]), text))
         else:
             values.append((text, bbox))
-
+    
     # Step 2: Sort by Y first, then X for better alignment detection
-    keys.sort(key=lambda x: (x[1][0][1], x[1][0][0]))
+    keys.sort(key=lambda x: (x[1][0][1], x[1][0][0]))  # Sort by Y, then X
     values.sort(key=lambda x: (x[1][0][1], x[1][0][0]))
-
+    bottom_tolerance = 20  # Adjust as needed
+    # Step 3: Matching the paired value for the given key
     key_value_pairs = []
+    capturedMethod = None
     print('key_info_list Values before Loop ---> ', key_info_list)
-
-    used_value_bboxes = []  # Track matched values to prevent re-use
-
     for eachKey in key_info_list:
         key_text = eachKey['standard_key']
         if eachKey["key_bounding_box"] is not None and eachKey["value"] is None:
             key_bbox = json.loads(eachKey['key_bounding_box'])
-            key_x1, key_y1 = key_bbox[0]  # Top-left
-            key_x2, key_y2 = key_bbox[1]  # Top-right
-            key_x3, key_y3 = key_bbox[2]  # Bottom-right
-            key_x4, key_y4 = key_bbox[3]  # Bottom-left
-
+            key_x1, key_y1 = key_bbox[0]  # Top-left of key
+            key_x2, key_y2 = key_bbox[1]  # Top-right of key
+            key_x3, key_y3 = key_bbox[2]  # bottom-right of key
+            key_x4, key_y4 = key_bbox[3]  # bottom-left of key
             closest_value = None
             min_x_distance = float('inf')
             min_y_distance = float('inf')
-
-            # Right aligned matching
+            # Right aliged side and within Y tolerance
             for val_text, val_bbox in values:
-                if val_bbox in used_value_bboxes:
-                    continue  # Skip reused values
-                val_x1, val_y1 = val_bbox[0]
-                val_x2, val_y2 = val_bbox[1]
+                val_x1, val_y1 = val_bbox[0]  # Top-left of value
+                val_x2, val_y2 = val_bbox[1]  # Top-right of value
 
+                # Ensure value is on the right side and within Y tolerance
                 average = statistics.mean([key_x1, key_x2])
                 if val_x1 > average and abs(val_y1 - key_y1) <= y_tolerance:
-                    x_distance = val_x1 - key_x2
+                    x_distance = val_x1 - key_x2  # Distance between key end and value start
+
                     if x_distance < min_x_distance:
                         min_x_distance = x_distance
                         closest_value = val_text
                         closest_bbox = val_bbox
-                        capturedMethod = 'right_aligned_pair'
+                        capturedMethod =  'right_aligned_pair'
                         closest_distance = calculate_distance(key_bbox, closest_bbox)
-                        print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance)
-                        for threshold in range(100, 1601, 100):
+                        print('Key value matched with the distance of ',closest_distance)
+                        for threshold in range(100, 1501, 100):  # Loop from 100 to 1500 by step of 100
                             if closest_value and closest_distance < threshold:
                                 key_value_pairs.append({
-                                    "key": key_text,
+                                    "key":key_text,
                                     "value": closest_value,
                                     "key_bbox": key_bbox,
                                     "value_bbox": closest_bbox,
                                     "method": capturedMethod,
-                                    "doc_text": eachKey['key'],
-                                    "closest_distance": closest_distance
+                                    "doc_text" : eachKey['key'],
+                                    "closest_distance" : closest_distance
                                 })
-                                used_value_bboxes.append(closest_bbox)
-                                print(f"[RIGHT] Matched {key_text} --> {closest_value} within threshold {threshold}: Distance = {closest_distance}")
-                                break
+                                print(f"Matched {key_text} --> within threshold {threshold}: Distance = {closest_distance}")
+                                break  # Stop at first acceptable match
+                if (key_y3 < val_y1 <= key_y3 + bottom_tolerance) and (key_x1 - bottom_tolerance <= val_x1 and key_x2 >= val_x1):
+                    y_distance = val_y1 - key_y3  # Distance between key bottom and value top
 
-            # Bottom aligned matching with gradual bottom_tolerance
-            for bottom_tolerance in range(10, 51, 10):
-                for val_text, val_bbox in values:
-                    if val_bbox in used_value_bboxes:
-                        continue  # Skip reused values
-                    val_x1, val_y1 = val_bbox[0]
-                    if (key_y3 < val_y1 <= key_y3 + bottom_tolerance) and (key_x1 - bottom_tolerance <= val_x1 <= key_x2):
-                        y_distance = val_y1 - key_y3
-                        if y_distance < min_y_distance:
-                            min_y_distance = y_distance
-                            closest_value = val_text
-                            closest_bbox = val_bbox
-                            capturedMethod = 'bottom_aligned_pair'
-                            closest_distance = calculate_distance(key_bbox, closest_bbox)
-                            print(f"Bottom-aligned match candidate for {key_text} --> {val_text} at tolerance {bottom_tolerance}: Distance = {closest_distance}")
-                            if closest_value and closest_distance < bottom_tolerance:
-                                key_value_pairs.append({
-                                    "key": key_text,
-                                    "value": closest_value,
-                                    "key_bbox": key_bbox,
-                                    "value_bbox": closest_bbox,
-                                    "method": capturedMethod,
-                                    "doc_text": eachKey['key'],
-                                    "closest_distance": closest_distance
-                                })
-                                used_value_bboxes.append(closest_bbox)
-                                break  # Stop once matched within a tolerance
-                else:
-                    continue  # Continue outer loop only if inner did not break
-                break  # Break outer loop if matched
-
+                    if y_distance < min_y_distance:  # Choose the closest vertical match
+                        min_y_distance = y_distance
+                        closest_value = val_text
+                        closest_bbox = val_bbox
+                        capturedMethod =  'bottom_aligned_pair'
+                        closest_distance = calculate_distance(key_bbox, closest_bbox)
+                        if closest_value:
+                            key_value_pairs.append({
+                                "key":key_text,
+                                "value": closest_value,
+                                "key_bbox": key_bbox,
+                                "value_bbox": closest_bbox,
+                                "method": capturedMethod,
+                                "doc_text" : eachKey['key'],
+                                "closest_distance" : closest_distance
+                            })
+        
         elif eachKey["value"] is not None:
-            print(f"Colon match used for: '{key_text}'")
+            print(f"Bounding Box matching if value found-> '{key_text}")
             key_value_pairs.append({
-                "key": key_text,
+                "key":key_text,
                 "value": eachKey["value"],
                 "key_bbox": json.loads(eachKey['key_bounding_box']),
                 "value_bbox": json.loads(eachKey['key_bounding_box']),
                 "method": 'colon_identification',
-                "doc_text": eachKey['key']
-            })
-
-    # Step 3: GST Pattern Matching
-    gst_pattern = r'\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}\b'
-    for entry in extracted_data:
-        text, bbox, confidence = entry
-        matches = re.findall(gst_pattern, text)
-        for match in matches:
-            print(f"[GST MATCH] Found GST: {match} in text: {text}")
-            key_value_pairs.append({
-                "key": "GST No",
-                "value": match,
-                "key_bbox": bbox,
-                "value_bbox": bbox,
-                "method": "gst_regex_match",
-                "doc_text": text
+                "doc_text" : eachKey['key']
             })
     return key_value_pairs
-
 
 ############################################################################################
 

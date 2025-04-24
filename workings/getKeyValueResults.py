@@ -11,14 +11,7 @@ from utilities import save_extracted_data
 import statistics
 
 # Initialize OCR with enhanced settings
-ocr = PaddleOCR(use_angle_cls=True, lang='en', 
-                rec_algorithm='CRNN', det_db_box_thresh=0.5, 
-                det=True,
-                rec=True,
-                structure=True,
-                show_log=True,
-                structure_version='PP-StructureV2',  # 👈 REQUIRED for SLANet
-                table_model_dir='/home/nspl/glbyte_ocr/tablemodel/slanet')
+ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
 csv_file = "extracted_batch_data.csv"
 
 doc_key_list = []
@@ -69,7 +62,7 @@ def preprocess_image(image_path):
 def extract_text(image_path,doc_name,output_folder,keyMappingData):
     """Extracts text and bounding boxes from an image using PaddleOCR."""
     img = preprocess_image(image_path)
-    result = ocr.ocr(img, cls=True, structure=True)
+    result = ocr.ocr(img, cls=True)
     rawtxtResult = result
     # print("\n🔹 PaddleOCR Raw Output:", result)
     if result is None or result == [None]:  # Handle empty or None result
@@ -98,8 +91,8 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     # print(f"Extracted text saved to: {output_rawtxt_path}")
 
     # # Save OCR result to a text file
-    with open(output_txt_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=4, ensure_ascii=False)
+    # with open(output_txt_path, "w", encoding="utf-8") as f:
+    #     json.dump(result, f, indent=4, ensure_ascii=False)
 
     # print(f"✅ OCR result saved at: {output_txt_path}")
     if not keyMappingData:  keyMappingData = key_mapping

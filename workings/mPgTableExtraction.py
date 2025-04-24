@@ -5,7 +5,7 @@ import os
 import re
 import numpy as np
 import csv
-from gl_utilities import cleanTabulaData
+from utilities import cleanTabulaData
 # import pyPdf
 
 
@@ -13,8 +13,8 @@ def readPdf4Page(filepath,page):
     array_data=[]
     # Reading PDF using Table and get Dataframes
     rows_list = tabula.read_pdf(filepath,pages=page,silent=True,stream=True,lattice=True,guess=False,encoding='utf-8',pandas_options={"header": None})
-        # area refers to the Portion of the page to analyze(top,left,bottom,right).
-        # print('rows_list --->', rows_list)# Check if tabula extracted multiple tables
+                                #area refers to the Portion of the page to analyze(top,left,bottom,right).
+    # print('rows_list --->', rows_list)# Check if tabula extracted multiple tables
     if isinstance(rows_list, list) and len(rows_list)>0 :
         df = pd.concat(rows_list, ignore_index=True)
         df = df.dropna(how="all").dropna(axis=1, how="all")
@@ -78,7 +78,7 @@ def runTabuleProcess_main(folderpath):
             print(f'multi page data  from {file_name}  and page count------> ', n)
             pageData = readPdf4Page(filepath,'all')
             if len(pageData) > 0:
-                print('Complete Extracted data length -------> ', len(pageData))
+                print('Complete Extracted data lenght -------> ', len(pageData))
                 cleanTabulaData(folderpath,pageData,'invoice',file_name,'')
 
 def runTabuleProcess_file(filepath):
@@ -116,7 +116,7 @@ def main():
     # file_name = os.path.splitext(os.path.basename(filepath))[0]
     # tableInfo = runTabuleProcess_file(filepath)
     # if len(tableInfo) > 0:  
-    #     cleanTabulaData(folderpath,tableInfo,'BANKSTMT',file_name,'IDFC')
+    #     cleanTabulaData(folderpath,tableInfo,'bankstmt',file_name,'IDFC')
     runTabuleProcess_main(folderpath)
     
 # main()

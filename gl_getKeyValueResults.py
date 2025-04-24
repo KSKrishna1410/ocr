@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCR, draw_ocr
 from fuzzywuzzy import fuzz, process  
 from getKeys4OCRobj import *
 import json
@@ -9,6 +9,11 @@ import os
 import csv
 from gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
 import statistics
+from tableMarkingDetection import OCRBoxDrawer, TableDetector
+from PIL import Image
+from gl_mistral import analyze_text_with_ai
+from gl_constants import regex_check
+from generateKey_mapping import documentClassifier, generate_key_mapping_remote
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
@@ -54,15 +59,11 @@ def preprocess_image(image_path):
     _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return img
 
-# def analyze_text_with_ai(text, task="Give me the Invoice details"):
-#     query = f"{task} this document:\n\n{text}"
-#     response = ollama.chat(model="mistral", messages=[{"role": "user", "content": query}])
-#     return response['message'] if response else "AI processing failed."
  
 def extract_text(image_path,doc_name,output_folder,keyMappingData):
     """Extracts text and bounding boxes from an image using PaddleOCR."""
     img = preprocess_image(image_path)
-    result = ocr.ocr(img, cls=True)
+    result = ocr.ocr(image_path, cls=True)
     rawtxtResult = result
     # print("\n🔹 PaddleOCR Raw Output:", result)
     if result is None or result == [None]:  # Handle empty or None result
@@ -87,6 +88,11 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     raw_txt_file = f"{doc_name}_paddleocr_rawtxt.txt"
     upload_to_sftp(raw_text_content, raw_txt_file, output_folder)
     print(f"✅ Extracted raw text uploaded to SFTP: {raw_txt_file}")
+    
+    document_Classifier = documentClassifier()
+    actual_doc_type = document_Classifier.classify_document(raw_text_content)
+    print(f"Extracted Document and Identified as {actual_doc_type}")
+    
 
     # Convert OCR result (JSON) to bytes
     ocr_json_content = json.dumps(result, indent=4, ensure_ascii=False).encode("utf-8")
@@ -94,6 +100,27 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     upload_to_sftp(ocr_json_content, ocr_result_file, output_folder)
     print(f"✅ OCR result JSON uploaded to SFTP: {ocr_result_file}")
     
+    
+
+    
+    flattened_result = [item for sublist in result for item in sublist]
+    output_image = f"{doc_name}_annotated.png"
+    drawer = OCRBoxDrawer(image_path, flattened_result)
+    image_with_boxes = drawer.draw_boxes()
+        # Step 2: Highlight table region
+    table_detector = TableDetector(flattened_result, doc_name)
+    image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
+    if is_table_cord:
+        table_detector.draw_grid(image_with_table)
+        table_detector.to_html()
+        table_detector.to_csv()
+    # Step 3: Save the output image
+    drawer.save_image(output_image)
+    with open(output_image, 'rb') as f:
+        image_content = f.read()
+    upload_to_sftp(image_content, output_image, output_folder)
+    
+
     
     # output_txt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_result.txt")  # Save in output folder
     # output_rawtxt_path = os.path.join(output_folder, f"{doc_name}_paddleocr_rawtxt.txt")  # Save in output folder
@@ -108,8 +135,11 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     #     json.dump(result, f, indent=4, ensure_ascii=False)
 
     # print(f"✅ OCR result saved at: {output_txt_path}")
-    if not keyMappingData:  keyMappingData = key_mapping
-    print('keyMappingData Generated: ', keyMappingData)
+    if actual_doc_type in document_Classifier.validDocument:
+        keyMappingData = document_Classifier.doc_type_mapping.get(actual_doc_type, keyMappingData)
+    
+    # if not keyMappingData:  keyMappingData = key_mapping
+    # print('keyMappingData Generated: ', keyMappingData)
     # print("\n🔹 PaddleOCR Raw Output:", result)
     doc_key_list_array = getKeylist(result, keyMappingData)
     for key in doc_key_list_array:
@@ -124,6 +154,7 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
             # text = word_info[1][0].strip() if isinstance(word_info[1][0], str) else str(word_info[1][0]) if isinstance(word_info[1][0], (float, int)) else word_info[1][0]
             confidence = word_info[1][1]  # Confidence score
             extracted_data.append((text, bbox, confidence))
+    print('sortedOCRresult in extract text - >', extracted_data)
     return find_aligned_value(extracted_data, doc_key_list_array)
 
 def match_key(text, key_list, threshold=85):
@@ -150,6 +181,7 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
     values = []
 
     # Step 1: Categorize extracted text into keys and values
+    print("Key info list:", key_info_list)
     for entry in extracted_data:
         text, bbox, confidence = entry
         matched_key_entry = next((key_entry for key_entry in key_info_list if key_entry["key"].lower() == text.lower()), None)
@@ -175,11 +207,21 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
             key_x2, key_y2 = key_bbox[1]  # Top-right
             key_x3, key_y3 = key_bbox[2]  # Bottom-right
             key_x4, key_y4 = key_bbox[3]  # Bottom-left
-
+            key_center_y = (key_y1 + key_y3) / 2
+            key_right = key_x2
             closest_value = None
             min_x_distance = float('inf')
             min_y_distance = float('inf')
+            actual_bottom_threshold = 35  # Define your bottom threshold
+            match_found = False
+            match_candidates = []
+            min_y_distance = float('inf')
+            bottom_closest_value = None
+            closest_bbox = None
 
+            # key_y3 = key_bbox[3][1]
+            # key_x1 = key_bbox[0][0]
+            # key_x2 = key_bbox[1][0]
             # Right aligned matching
             for val_text, val_bbox in values:
                 if val_bbox in used_value_bboxes:
@@ -188,16 +230,21 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                 val_x2, val_y2 = val_bbox[1]
 
                 average = statistics.mean([key_x1, key_x2])
+                # print(f'[{val_text}] - [{key_text}] - Before going into to check val_x1:  {val_x1} and average : {average} and abs(val_y1 - key_y1) {abs(val_y1 - key_y1)}')
+                # if val_x1 > key_x1-10 and val_x1 < key_x2 and abs(val_y1 - key_y1) <= y_tolerance and val_bbox != key_bbox:
                 if val_x1 > average and abs(val_y1 - key_y1) <= y_tolerance:
                     x_distance = val_x1 - key_x2
+                    # print(f'Inside going into to x_distance : {x_distance} and min_x_distance {min_x_distance}')
                     if x_distance < min_x_distance:
                         min_x_distance = x_distance
                         closest_value = val_text
                         closest_bbox = val_bbox
                         capturedMethod = 'right_aligned_pair'
                         closest_distance = calculate_distance(key_bbox, closest_bbox)
-                        print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance)
-                        existing_index = next((i for i, kv in enumerate(key_value_pairs) if kv["key"] == key_text), None)
+                        # print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance)
+                        existing_index = next((i for i, kv in enumerate(key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
+                        if existing_index is not None:
+                            print(f'Right-aligned match candidate at index: {existing_index} , {key_value_pairs[existing_index]}')
                         for threshold in range(100, 1601, 100):
                             if closest_value and closest_distance < threshold:
                                 if existing_index is None:
@@ -215,7 +262,8 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                                     break
                                 else:
                                     # If it exists, only replace if new distance is smaller
-                                    existing_distance = key_value_pairs[existing_index]["closest_distance"]
+                                    existing_entry = key_value_pairs[existing_index]
+                                    existing_distance = existing_entry.get("closest_distance", float('inf'))
                                     if closest_distance < existing_distance:
                                         # Replace the existing entry
                                         key_value_pairs[existing_index] = {
@@ -260,43 +308,97 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
             #     break  # Break outer loop if matched
 
             # Bottom aligned matching with gradual bottom_tolerance
-            actual_bottom_threshold = 60  # Define your bottom threshold
-            match_found = False
-            match_candidates = []
+
+            # for val_text, val_bbox in values:
+            #     if val_bbox in used_value_bboxes:
+            #         continue  # Skip reused values
+
+            #     val_x1, val_y1 = val_bbox[0]
+
+            #     if (key_y3 < val_y1 <= key_y3 + actual_bottom_threshold) and (key_x1 - actual_bottom_threshold <= val_x1 <= key_x2):
+            #         # print(f"[Bottom] initiating Bottom Method {key_text} --> {val_text}")
+            #         y_distance = val_y1 - key_y3
+            #         # print(f"[Y Distance] in Bottom Method {y_distance} and the min_y_dist {min_y_distance}")
+
+            #         if y_distance < min_y_distance:
+            #             min_y_distance = y_distance
+            #             closest_value = val_text
+            #             closest_bbox = val_bbox
+            #             capturedMethod = 'bottom_aligned_pair'
+            #             closest_distance = calculate_distance(key_bbox, closest_bbox)
+            #             print(f"Bottom-aligned match candidate for {key_text} --> {val_text}: Distance = {closest_distance}")
+            #             # if closest_value and closest_distance < actual_bottom_threshold:
+            #             if closest_value:
+            #                 key_value_pairs.append({
+            #                     "key": key_text,
+            #                     "value": closest_value,
+            #                     "key_bbox": key_bbox,
+            #                     "value_bbox": closest_bbox,
+            #                     "method": capturedMethod,
+            #                     "doc_text": eachKey['key'],
+            #                     "closest_distance": closest_distance
+            #                 })
+            #                 print(f"✅ Bottom KVP-aligned match for {key_text} --> {val_text}")
+            #                 used_value_bboxes.append(closest_bbox)
+            #                 match_found = True
+            #                 break  # Stop checking once a valid match is found
+
+
             for val_text, val_bbox in values:
                 if val_bbox in used_value_bboxes:
-                    continue  # Skip reused values
+                    continue  # skip already used
 
                 val_x1, val_y1 = val_bbox[0]
+                val_y3 = val_bbox[2][1]
+                
+                # ✅ Filter values directly below key within a tight vertical margin
+                y_distance = val_y1 - key_y3
+                if not (0 <= y_distance <= actual_bottom_threshold):
+                    continue
 
-                if (key_y3 < val_y1 <= key_y3 + actual_bottom_threshold) and (key_x1 - actual_bottom_threshold <= val_x1 <= key_x2):
-                    print(f"[Bottom] initiating Bottom Method {key_text} --> {val_text}")
-                    y_distance = val_y1 - key_y3
-                    print(f"[Y Distance] in Bottom Method {y_distance} and the min_y_dist {min_y_distance}")
+                # ✅ Check if it's horizontally aligned with the key
+                if not (key_x1 - 30 <= val_x1 <= key_x2 + 30):  # give a little buffer
+                    continue
 
-                    if y_distance < min_y_distance:
-                        min_y_distance = y_distance
-                        closest_value = val_text
-                        closest_bbox = val_bbox
-                        capturedMethod = 'bottom_aligned_pair'
-                        closest_distance = calculate_distance(key_bbox, closest_bbox)
-                        print(f"Bottom-aligned match candidate for {key_text} --> {val_text}: Distance = {closest_distance}")
+                # ✅ Pick the closest y-distance only (avoid full Euclidean overshoot)
+                if y_distance < min_y_distance:
+                    min_y_distance = y_distance
+                    bottom_closest_value = val_text
+                    closest_bbox = val_bbox
+                    capturedMethod = 'bottom_aligned_pair'
+            print(f'Before going into to check val_x1:  ')
+            if bottom_closest_value == None:
+               # ✅ Value is horizontally aligned or slightly below
+                if not (key_center_y - 10 <= val_y1 <= key_center_y + 20):  # allow small vertical offset
+                    continue
 
-                        if closest_value and closest_distance < actual_bottom_threshold:
-                            key_value_pairs.append({
-                                "key": key_text,
-                                "value": closest_value,
-                                "key_bbox": key_bbox,
-                                "value_bbox": closest_bbox,
-                                "method": capturedMethod,
-                                "doc_text": eachKey['key'],
-                                "closest_distance": closest_distance
-                            })
-                            print(f"✅ Bottom KVP-aligned match for {key_text} --> {val_text}")
-                            used_value_bboxes.append(closest_bbox)
-                            match_found = True
-                            break  # Stop checking once a valid match is found
+                # ✅ Value starts to the right of the key
+                if not (val_x1 >= key_right - 20):  # slight overlap allowed
+                    continue
 
+                # ✅ Use minimum horizontal distance instead of Euclidean
+                x_distance = val_x1 - key_right
+                if x_distance < min_y_distance:
+                    min_y_distance = x_distance
+                    bottom_closest_value = val_text
+                    closest_bbox = val_bbox
+                    capturedMethod = 'right_bottom_pair' 
+            
+            # ✅ Once loop is over, add the closest match
+            if bottom_closest_value:
+                closest_distance = calculate_distance(key_bbox, closest_bbox)
+                key_value_pairs.append({
+                    "key": key_text,
+                    "value": bottom_closest_value,
+                    "key_bbox": key_bbox,
+                    "value_bbox": closest_bbox,
+                    "method": capturedMethod,
+                    "doc_text": eachKey['key'],
+                    "closest_distance": closest_distance
+                })
+                print(f"✅ Bottom match for {key_text} --> {bottom_closest_value} with Y-distance: {min_y_distance}")
+                used_value_bboxes.append(closest_bbox)
+                match_found = True
         elif eachKey["value"] is not None:
             print(f"Colon match used for: '{key_text}'")
             key_value_pairs.append({
@@ -308,21 +410,26 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
                 "doc_text": eachKey['key']
             })
 
-    # Step 3: GST Pattern Matching
-    gst_pattern = r'\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}\b'
-    for entry in extracted_data:
-        text, bbox, confidence = entry
-        matches = re.findall(gst_pattern, text)
-        for match in matches:
-            print(f"[GST MATCH] Found GST: {match} in text: {text}")
-            key_value_pairs.append({
-                "key": "GST No",
-                "value": match,
-                "key_bbox": bbox,
-                "value_bbox": bbox,
-                "method": "gst_regex_match",
-                "doc_text": text
-            })
+    for rule in regex_check:
+        pattern = rule["pattern"]
+        key_name = rule["key"]
+        
+        # Loop through OCR extracted data
+        for entry in extracted_data:
+            text, bbox, confidence = entry
+            matches = re.findall(pattern, text)
+            
+            for match in matches:
+                print(f"[PATTERN MATCH] Found {key_name}: {match} in text: {text}")
+                key_value_pairs.append({
+                    "key": key_name,
+                    "value": match,
+                    "key_bbox": bbox,
+                    "value_bbox": bbox,
+                    "method": "regex_match",
+                    "doc_text": text
+                })
+    
     return key_value_pairs
 
 
@@ -340,3 +447,24 @@ def process_document(image_path, doc_name, opfldr, keyMappingData):
 
 def ProcessFile():
     print('Inside Process function')
+    
+def PaddleDrawMethod(result):
+    image = Image.open(image_path).convert('RGB')
+    boxes = []
+    txts = []
+    scores = []
+
+    # Flatten the result list properly
+    for line in result[0]:  # PaddleOCR returns a list of pages; use result[0] for single page
+        box = line[0]
+        (text, score) = line[1]
+        boxes.append(box)
+        txts.append(text)
+        scores.append(score)
+    im_show = draw_ocr(image, boxes, txts, scores, font_path='/home/nspl/glbyte_ocr/simfang.ttf')
+    im_show = Image.fromarray(im_show)
+    im_show.save(f"{doc_name}_annotated_img_result.jpg")
+    with open(f"{doc_name}_annotated_img_result.jpg", 'rb') as f:
+        ocr_image_content = f.read()
+    upload_to_sftp(ocr_image_content, f"{doc_name}_annotated_img_result.jpg", output_folder)
+    

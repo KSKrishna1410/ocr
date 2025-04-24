@@ -3,6 +3,7 @@ import re
 import os
 import csv
 import numpy as np
+import pandas as pd
 import os
 import paramiko
 from dotenv import load_dotenv
@@ -145,7 +146,7 @@ def cleanTabulaData(folderpath,final_array,docType, document, bank_name):
     data = []
     expected_headers = bank_headers.get(bank_name, [])  # Return empty list if bank not found
     print(f'Expected header -- {len(expected_headers)}  final_array[0] length --> {len(final_array[0])} and the final array is {final_array[0]}')
-    if (docType == 'bankstmt' and len(expected_headers) > 0):
+    if (docType == 'BANKSTMT' and len(expected_headers) > 0):
         matched_header_index = 0
         header_index = None
         # Find the header row index
@@ -201,7 +202,7 @@ def cleanTabulaData_remote(remote_dir, final_array, docType, document, bank_name
 
     print(f'Expected header -- {len(expected_headers)}  final_array[0] length --> {len(final_array[0])} and the final array is {final_array[0]}')
 
-    if docType == 'bankstmt' and len(expected_headers) > 0:
+    if docType == 'BANKSTMT' and len(expected_headers) > 0:
         matched_header_index = 0
         header_index = None
         for i, row in enumerate(final_array):
@@ -254,6 +255,19 @@ def cleanTabulaData_remote(remote_dir, final_array, docType, document, bank_name
 
     return data
 
+
+def prepareRemotePath(fileName,uniqueId):
+    # REMOTE_DIR = os.getenv("REMOTE_DIR", "/files/inHouseOCR")
+    REMOTE_DIR = "/files/inHouseOCR"
+    # Get file_name without extension
+    file_name = os.path.splitext(fileName)[0]
+    print('Inside SFTP connection method file_name', file_name)
+    # Get current timestamp
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    # Construct remote_dir = REMOTE_DIR/file_name/timestamp
+    # remote_dir = f"{REMOTE_DIR}/{fileName}" #for filename as a folder
+    remote_dir = f"{REMOTE_DIR}/{uniqueId}"
+    return remote_dir
 
 def ensure_remote_dir_exists(sftp, remote_dir):
     """
@@ -362,3 +376,19 @@ def read_file_from_sftpFldr(remote_path: str) -> bytes:
         return remote_files
     except Exception as e:
         return {"error": str(e)}
+    
+    
+def convert_ndarray(obj):
+    if isinstance(obj, dict):
+        return {k: convert_ndarray(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_ndarray(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_ndarray(item) for item in obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient='records')  # or use 'split', 'index' as needed
+    else:
+        return obj
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

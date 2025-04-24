@@ -98,7 +98,7 @@ class DocumentAnalyzer:
 
     def analyze_and_extract(self):
         self._classify_document()
-        self._draw_and_save_table()
+        # self._draw_and_save_table()
         self._prepare_document_key_value_pairs()
         # for line in self.result:
         #     for word_info in line:
@@ -131,8 +131,8 @@ class DocumentAnalyzer:
 
         if is_table_cord:
             table_detector.draw_grid(image_with_table)
-            table_detector.to_html()
-            table_detector.to_csv()
+            # table_detector.to_html()
+            # table_detector.to_csv()
 
         output_image = f"{self.doc_name}_annotated.png"
         cv2.imwrite(output_image, image_with_table)
@@ -160,7 +160,7 @@ class KeyValueIdentifierClass:
         self.x_align4_bottom = 35
         
     def categorize_data(self):
-        print("Key info list:", self.key_info_list)
+        # print("Key info list:", self.key_info_list)
         for text, bbox, confidence in self.sortedOCRresult:
             matched = next((k for k in self.key_info_list if k["key"].lower() == text.lower()), None)
             if matched and matched["key_bounding_box"]:

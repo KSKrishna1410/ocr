@@ -1,8 +1,6 @@
 import os
 import shutil
 import json
-import numpy as np
-import pandas as pd
 import time
 import traceback
 import sys
@@ -31,7 +29,9 @@ from gl_convert_pdftoImage import pdf2ImageMethod
 from gl_KeyValueIdentifier import OCRExtractorAndSaver, DocumentAnalyzer
 from generateKey_mapping import generate_key_mapping_remote
 from gl_mPgTableExtraction import runTabuleProcess_file
-from gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp
+from gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray
+
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,8 +65,8 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 @app.post("/ocr_process/")
 async def ocr_process_file(
     file: UploadFile = File(...),
-    doctype: Optional[Literal["invoice", "bankstmt"]] = Form(None)
-    # doctype: Literal["invoice", "bankstmt"] = Form(...)
+    doctype: Optional[Literal["INVOICE", "BANKSTMT"]] = Form(None)
+    # doctype: Literal["invoice", "BANKSTMT"] = Form(...)
     # input_folder: Optional[str] = Form(None)
 ):
     try:
@@ -84,6 +84,7 @@ async def ocr_process_file(
         # file_id = str(uuid.uuid4())
         print(f"Filename: {file.filename} and the file path {temp_file_path}")  # Print or store it for further use
         ocrObject = processOcr(temp_dir, doctype,temp_file_name,uniqueId)
+        # ocrObject = processOcr_new(temp_dir, doctype,temp_file_name,uniqueId)
         cleaned_ocrObject = convert_ndarray(ocrObject)
         shutil.rmtree(temp_dir)
         return {"status_code":200,"status":'Success',"data": cleaned_ocrObject}
@@ -101,7 +102,7 @@ async def ocr_process_file(
 @app.post("/ocr_batch_process/")
 async def ocr_batch_process(
     folder_path: str = Form(...),
-    doctype: Literal["invoice", "bankstmt"] = Form(...)
+    doctype: Literal["invoice", "BANKSTMT"] = Form(...)
 ):
     processed = []
 
@@ -130,7 +131,7 @@ async def ocr_batch_process(
 @app.post("/ocr_batch_process_sftp/")
 async def ocr_batch_process_sftp(
     folder_path: str = Form(...),
-    doctype: Literal["invoice", "bankstmt"] = Form(...)
+    doctype: Literal["INVOICE", "BANKSTMT"] = Form(...)
 ):
     # SFTP Config
     SFTP_HOST = os.getenv("SFTP_HOST")
@@ -209,7 +210,7 @@ async def ocr_batch_process_sftp(
     except Exception as e:
         return {"error": str(e)}
     
-    REMOTE_DIR = "/files/inHouseOCR"
+    REMOTE_DIR = "/files/ocr_files"
     # Upload to SFTP using your common method
     json_str = json.dumps(processed, indent=4, default=convert_ndarray)
     json_bytes = json_str.encode("utf-8") # Encode to bytes
@@ -218,81 +219,72 @@ async def ocr_batch_process_sftp(
     return {"processed": processed}
 
 
+############################################################
+# Main Process 
+############################################################
 
-def prepareRemotePath(fileName,uniqueId):
-    # REMOTE_DIR = os.getenv("REMOTE_DIR", "/files/inHouseOCR")
-    REMOTE_DIR = "/files/inHouseOCR"
-    # Get file_name without extension
-    file_name = os.path.splitext(fileName)[0]
-    print('Inside SFTP connection method file_name', file_name)
-    # Get current timestamp
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    # Construct remote_dir = REMOTE_DIR/file_name/timestamp
-    # remote_dir = f"{REMOTE_DIR}/{fileName}" #for filename as a folder
-    remote_dir = f"{REMOTE_DIR}/{uniqueId}"
-    return remote_dir
-
-
-def processOcr(folder_path, docType, file,uniqueId):
-    print(f"📂 Inside main function:")
-    extracted_data = ""
-    remote_path = ""
-    ifsc_code = None
-    bank_name = None
+def processOcr(folder_path, docType, file, uniqueId):
+    print(f"\U0001F4C2 Inside main function:")
     file_name = os.path.splitext(file)[0]
+    remote_dir, remote_path = handle_file_upload(folder_path, file, file_name, uniqueId)
+    image_paths, fileType = handle_image_conversion(folder_path, file, remote_dir)
     keyMappingData = []
-    remote_dir = prepareRemotePath(file_name,uniqueId)
-    if docType:
-        keyMappingData = generate_key_mapping_remote(docType)
-
-    file_path = os.path.join(folder_path, file)
-    print(f"📄 Filename: {file_name}")
-
-    # Upload original file to SFTP
-    with open(file_path, "rb") as f:
-        file_content = f.read()
-        remote_path = upload_to_sftp(file_content, file, remote_dir)
-    print(f"🌐 SFTP Path: {remote_path}")
-
-    # Convert PDF/image to images and get image paths
-    if file.lower().endswith((".jpg", ".jpeg", ".png", ".pdf")):
-        image_paths, fileType = pdf2ImageMethod(folder_path, remote_dir, folder_path, file)
-    else:
-        print("❌ Unsupported file format.")
-        return
-
     if not image_paths:
         print("❌ No images found for processing.")
         return
 
     print(f"✅ Found {len(image_paths)} images. Processing...")
+    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType)
 
-    finalOutput = {
+    if docType:
+        keyMappingData = generate_key_mapping_remote(docType)
+    extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
+
+    if docType == 'BANKSTMT' and ifsc_code:
+        bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
+    else:
+        bank_name = None
+
+    if file.lower().endswith(".pdf"):
+        tableInfo = handle_tabular_data(folder_path, file, remote_dir, docType, bank_name)
+        finalOutput["lineTabulaData"] = tableInfo
+
+    upload_results(remote_dir, file_name, finalOutput)
+    return finalize_output(finalOutput)
+
+def handle_file_upload(folder_path, file, file_name, uniqueId):
+    remote_dir = prepareRemotePath(file_name, uniqueId)
+    file_path = os.path.join(folder_path, file)
+    with open(file_path, "rb") as f:
+        remote_path = upload_to_sftp(f.read(), file, remote_dir)
+    print(f"🌐 SFTP Path: {remote_path}")
+    return remote_dir, remote_path
+
+def handle_image_conversion(folder_path, file, remote_dir):
+    if file.lower().endswith((".jpg", ".jpeg", ".png", ".pdf")):
+        return pdf2ImageMethod(folder_path, remote_dir, folder_path, file)
+    print("❌ Unsupported file format.")
+    return [], None
+
+def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType):
+    return {
         "processId": uniqueId,
         "filePath": remote_path,
         "fileDir": remote_dir,
         "document_type": docType.upper() if docType else None,
-        "pageSize": len(image_paths),
+        "rawtext": '',
         "fileType": fileType,
         "headerData": [],
         "lineTabulaData": []
     }
 
-    tableInfo = []
-    # Loop through each image
+def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType):
+    ifsc_code = None
     for index, image_path in enumerate(image_paths):
         print(f"\n🔍 Processing Image: {image_path}")
         page_file_name = os.path.splitext(os.path.basename(image_path))[0]
 
-        # Process the image using your custom OCR pipeline
-        # extracted_data = process_document(image_path, page_file_name, remote_dir, keyMappingData)
-
-        ocr_extraction = OCRExtractorAndSaver(
-            image_path=image_path,
-            doc_name=page_file_name,
-            output_folder=remote_dir,
-        )
-
+        ocr_extraction = OCRExtractorAndSaver(image_path, page_file_name, remote_dir)
         if ocr_extraction.perform_ocr_and_save():
             analyzer = DocumentAnalyzer(
                 doc_name=page_file_name,
@@ -301,76 +293,46 @@ def processOcr(folder_path, docType, file,uniqueId):
                 raw_text=ocr_extraction.raw_text,
                 key_mapping_data=keyMappingData,
                 sftp_uploader=upload_to_sftp,
-                remote_path= remote_dir
+                remote_path=remote_dir
             )
             extracted_data = analyzer.analyze_and_extract()
-            print('Inside main method ----------->', analyzer.actual_doc_type )
-            
             finalOutput["headerData"].append({
                 "page": index + 1,
                 "identified_doc_type": analyzer.actual_doc_type,
-                "rawtext" : ocr_extraction.raw_text,
+                "rawtext": ocr_extraction.raw_text,
                 "extractedData": extracted_data
             })
 
-        if isinstance(extracted_data, str):
-            extracted_data = json.loads(extracted_data)
+            if isinstance(extracted_data, str):
+                extracted_data = json.loads(extracted_data)
 
-        # Special handling for bank statement
-        if docType == 'bankstmt':
-            for item in extracted_data:
-                if item.get("key") == "IFSC Code":
-                    ifsc_pattern = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
-                    ifsc_code = extract_first_match(item.get("value"), ifsc_pattern) or ifsc_code
-                    print('🏦 IFSC Code fetched:', ifsc_code)
-            if ifsc_code is None:
-                print("⚠️ IFSC Code not found")
+            if docType == 'BANKSTMT':
+                for item in extracted_data:
+                    if item.get("key") == "IFSC Code":
+                        pattern = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
+                        ifsc_code = extract_first_match(item.get("value"), pattern) or ifsc_code
+                        print('🏦 IFSC Code fetched:', ifsc_code)
+    return extracted_data, ifsc_code
 
-        
-    # Fetch bank name if IFSC code was found
-    if docType == 'bankstmt' and ifsc_code:
-        print('📘 Fetching bank details for IFSC...')
-        bankDetails = get_bank_name(ifsc_code)
-        print('🏦 BankInfo:', bankDetails)
-        bank_name = bankDetails.get("BANK")
-        saveBankInfo(bankDetails, file_name, remote_dir)
+def enrich_bank_info(ifsc_code, file_name, remote_dir):
+    print('📘 Fetching bank details for IFSC...')
+    bankDetails = get_bank_name(ifsc_code)
+    print('🏦 BankInfo:', bankDetails)
+    saveBankInfo(bankDetails, file_name, remote_dir)
+    return bankDetails.get("BANK")
 
-    # Run Tabula if file is PDF
-    if file.lower().endswith(".pdf"):
-        filepath = os.path.join(folder_path, file)
-        tableInfo = runTabuleProcess_file(filepath)
+def handle_tabular_data(folder_path, file, remote_dir, docType, bank_name):
+    tableInfo = runTabuleProcess_file(os.path.join(folder_path, file))
+    if tableInfo:
+        return cleanTabulaData_remote(remote_dir, tableInfo, docType, file, bank_name)
+    return []
 
-        if tableInfo:
-            cleanedData = cleanTabulaData_remote(remote_dir, tableInfo, docType, file, bank_name)
-            finalOutput["lineTabulaData"] = cleanedData
-        # finalOutput["lineTabulaData"] = tableInfo
-    print('✅ Completed Table Extraction:', tableInfo)
-
-    # Upload to SFTP using your common method
+def upload_results(remote_dir, file_name, finalOutput):
     json_str = json.dumps(finalOutput, indent=4, default=convert_ndarray)
-    json_bytes = json_str.encode("utf-8") # Encode to bytes
-    remote_file_name = f"{file_name}_final.json" # Define the remote file name and directory
-    upload_to_sftp(json_bytes, remote_file_name, remote_dir)
+    remote_file_name = f"{file_name}_final.json"
+    upload_to_sftp(json_str.encode("utf-8"), remote_file_name, remote_dir)
 
-    for idx, item in enumerate(finalOutput.get("lineTabulaData", [])):
-        print(f"🔍 lineTabulaData[{idx}] type:", type(item))
-    if len(finalOutput.get("lineTabulaData", [])) == 0 and finalOutput.get("fileType") != 'Image':
+def finalize_output(finalOutput):
+    if not finalOutput.get("lineTabulaData") and finalOutput.get("fileType") != 'Image':
         finalOutput["fileType"] = 'Scanned Document'
-    final_output = convert_ndarray(finalOutput)
-    return final_output
-
-
-def convert_ndarray(obj):
-    if isinstance(obj, dict):
-        return {k: convert_ndarray(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_ndarray(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(convert_ndarray(item) for item in obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, pd.DataFrame):
-        return obj.to_dict(orient='records')  # or use 'split', 'index' as needed
-    else:
-        return obj
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+    return convert_ndarray(finalOutput)

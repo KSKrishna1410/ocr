@@ -28,12 +28,12 @@ def generate_key_mapping(doctype):
 def generate_key_mapping_remote(doctype):
     key_mapping = {}
     all_keys = []
-    if doctype.lower() == 'invoice' or doctype.lower() == 'Invoice':
+    if doctype.lower() == 'invoice' :
         remote_csv_path = "/files/ocr_files/Invoice_keys.csv"
-    elif doctype.lower() == 'bankstmt' or doctype.lower() =='Bank Statement':
+    elif doctype.lower() == 'bankstmt' or doctype.lower() =='bank statement':
         remote_csv_path = "/files/ocr_files/bankstmt_keys.csv"
     else:
-        raise ValueError("Currently only 'invoice and Bankstmt' document type is supported.")
+        raise ValueError("Currently only 'Invoice and BANKSTMT' document type is supported.")
 
     # 🔄 Get CSV content as bytes and decode to string
     csv_bytes = read_file_from_sftp(remote_csv_path)
@@ -64,13 +64,13 @@ class documentClassifier:
         self.invoice_keywords = []
         self.bank_key_mapping = {}
         self.bank_keywords = []
-        self.validDocument = ['Invoice', 'Bank Statement' ]
+        self.validDocument = ['INVOICE', 'BANKSTMT' ]
         
         self._load_csv("/files/ocr_files/Invoice_keys.csv", self.invoice_key_mapping, self.invoice_keywords)
         self._load_csv("/files/ocr_files/bankstmt_keys.csv", self.bank_key_mapping, self.bank_keywords)
         self.doc_type_mapping = {
-            'Invoice': self.invoice_key_mapping,
-            'Bank Statement': self.bank_key_mapping
+            'INVOICE': self.invoice_key_mapping,
+            'BANKSTMT': self.bank_key_mapping
         }
         
         
@@ -97,14 +97,13 @@ class documentClassifier:
         if isinstance(text, bytes):
             text = text.decode("utf-8")
         
-        print(f'Inside document Classifier {text}')
         invoice_score = sum(1 for word in self.invoice_keywords if word.lower() in text.lower())
         bank_score = sum(1 for word in self.bank_keywords if word.lower() in text.lower())
 
         if invoice_score > bank_score:
-            return "Invoice"
+            return "INVOICE"
         elif bank_score > invoice_score:
-            return "Bank Statement"
+            return "BANKSTMT"
         else:
             return "Unknown"
 

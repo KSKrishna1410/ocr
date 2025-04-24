@@ -116,7 +116,7 @@ def main():
     # file_name = os.path.splitext(os.path.basename(filepath))[0]
     # tableInfo = runTabuleProcess_file(filepath)
     # if len(tableInfo) > 0:  
-    #     cleanTabulaData(folderpath,tableInfo,'bankstmt',file_name,'IDFC')
+    #     cleanTabulaData(folderpath,tableInfo,'BANKSTMT',file_name,'IDFC')
     runTabuleProcess_main(folderpath)
     
 # main()

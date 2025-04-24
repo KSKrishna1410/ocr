@@ -1,0 +1,5 @@
+export SFTP_HOST=$(cat ${SFTP_HOST})
+export SFTP_PORT=$(cat ${SFTP_PORT})
+export SFTP_USERNAME=$(cat ${SFTP_USERNAME})
+export SFTP_PASSWORD=$(cat ${SFTP_PASSWORD})
+export REMOTE_DIR=$(cat ${REMOTE_DIR})

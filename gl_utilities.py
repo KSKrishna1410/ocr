@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import os
 import paramiko
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 import time
 import io
 
-load_dotenv()
+
 
 csv_file = "key_pair_extracted_data.csv"
 bank_headers = {

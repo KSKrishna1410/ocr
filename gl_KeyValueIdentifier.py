@@ -14,7 +14,6 @@ from paddleocr import PaddleOCR, draw_ocr
 from getKeys4OCRobj import getKeylist
 from gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
 from tableMarkingDetection import OCRBoxDrawer, TableDetector
-from gl_mistral import analyze_text_with_ai
 from generateKey_mapping import documentClassifier, generate_key_mapping_remote
 
 

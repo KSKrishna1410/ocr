@@ -40,12 +40,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=None, redoc_url=None)
 
 # Serve static files (CSS/JS) for Swagger UI
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/app/static", StaticFiles(directory="app/static"), name="static")
 
 # Serve custom Swagger UI
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
-    return FileResponse("static/swagger-ui/index.html")
+    return FileResponse("app/static/swagger-ui/index.html")
 
 # Path to your templates folder
 templates = Jinja2Templates(directory="templates")
@@ -59,7 +59,7 @@ async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # Ensure temp directory exists
-TEMP_DIR = "temp_uploads"
+TEMP_DIR = "app/temp_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 @app.post("/ocr_process/")

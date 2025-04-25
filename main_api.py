@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=None, redoc_url=None)
 
 # Serve static files (CSS/JS) for Swagger UI
-app.mount("/app/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "lib"), name="static")
 
 # Serve custom Swagger UI
 @app.get("/docs", include_in_schema=False)

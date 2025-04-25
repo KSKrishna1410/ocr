@@ -2,7 +2,7 @@ import os
 import argparse
 from convert_pdftoImage import pdf2ImageMethod
 from getKeyValueResults import process_document
-from generateKey_mapping import generate_key_mapping
+from src.generateKey_mapping import generate_key_mapping
 from mPgTableExtraction import runTabuleProcess_file
 import json
 import numpy as np

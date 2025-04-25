@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import os
 import paramiko
-# from dotenv import load_dotenv
 import time
 import io
 
-
+from dotenv import load_dotenv
+load_dotenv()
 
 csv_file = "key_pair_extracted_data.csv"
 bank_headers = {
@@ -281,6 +281,19 @@ def ensure_remote_dir_exists(sftp, remote_dir):
             sftp.stat(current_path)
         except FileNotFoundError:
             sftp.mkdir(current_path)
+            
+def getSFTP(file_content: bytes, filename: str, remote_dir) -> str:
+    SFTP_HOST = os.getenv("SFTP_HOST")
+    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
+    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+    try:
+        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        return sftp
+    except Exception as e:
+        raise RuntimeError(f"SFTP Upload Failed: {e}")
 
 def upload_to_sftp(file_content: bytes, filename: str, remote_dir) -> str:
     SFTP_HOST = os.getenv("SFTP_HOST")

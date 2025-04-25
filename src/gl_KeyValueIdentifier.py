@@ -11,14 +11,14 @@ from PIL import Image
 from fuzzywuzzy import fuzz, process  
 from paddleocr import PaddleOCR, draw_ocr
 
-from getKeys4OCRobj import getKeylist
-from gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
-from tableMarkingDetection import OCRBoxDrawer, TableDetector
-from generateKey_mapping import documentClassifier, generate_key_mapping_remote
+from src.getKeys4OCRobj import getKeylist
+from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
+from src.tableMarkingDetection import OCRBoxDrawer, TableDetector
+from src.generateKey_mapping import documentClassifier, generate_key_mapping_remote
 
 
 
-from gl_constants import regex_check
+from src.gl_constants import regex_check
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
 

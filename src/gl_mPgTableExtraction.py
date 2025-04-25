@@ -5,7 +5,7 @@ import os
 import re
 import numpy as np
 import csv
-from gl_utilities import cleanTabulaData
+from src.gl_utilities import cleanTabulaData
 # import pyPdf
 
 

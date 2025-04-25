@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from paddleocr import PaddleOCR
 from fuzzywuzzy import fuzz, process  
-from getKeys4OCRobj import *
+from src.getKeys4OCRobj import *
 import json
 import math
 import os

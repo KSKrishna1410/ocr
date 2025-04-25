@@ -85,7 +85,8 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 "page": index + 1,
                 "identified_doc_type": analyzer.actual_doc_type,
                 "rawtext": ocr_extraction.raw_text,
-                "extractedData": extracted_data
+                "extractedData": extracted_data,
+                "lineDetails": analyzer.ppOCRTableData
             })
 
             if isinstance(extracted_data, str):

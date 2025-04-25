@@ -94,10 +94,11 @@ class DocumentAnalyzer:
             (line[1][0].strip(), line[0], line[1][1])
             for result in self.result for line in result
         ] #text, bbox, confidence in self.extracted_data
+        self.ppOCRTableData = {}
 
     def analyze_and_extract(self):
         self._classify_document()
-        # self._draw_and_save_table()
+        self._draw_and_save_table()
         self._prepare_document_key_value_pairs()
         # for line in self.result:
         #     for word_info in line:
@@ -129,7 +130,9 @@ class DocumentAnalyzer:
         image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
 
         if is_table_cord:
-            table_detector.draw_grid(image_with_table)
+            table_detector.map_and_get_tableData(image_with_table)
+            self.ppOCRTableData['lineData'] = table_detector.table_data
+            self.ppOCRTableData['tableInfo'] = table_detector.table_header_info
             # table_detector.to_html()
             # table_detector.to_csv()
 

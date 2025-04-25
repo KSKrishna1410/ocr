@@ -52,6 +52,8 @@ class TableDetector:
         self.rows = self.identify_rows(self.table_elements)
         self.columns = self.identify_columns(self.rows)
         self.table_cord = ''
+        self.table_data = []
+        self.table_header_info = []
         
     def detect_table_start(self):
         sorted_data = sorted(self.ocr_data, key=lambda item: min(p[1] for p in item[0]))
@@ -148,40 +150,6 @@ class TableDetector:
             rows.append(current_row)
         return rows
     
-    def identify_rows_v1(self, table_elements, row_threshold=10):
-        # Sort based on the top of each element
-        sorted_data = sorted(table_elements, key=lambda item: min(p[1] for p in item[0]))
-        
-        rows = []
-        current_row = []
-        current_min_y, current_max_y = None, None
-
-        for polygon, text_info in sorted_data:
-            poly_ys = [p[1] for p in polygon]
-            min_y, max_y = min(poly_ys), max(poly_ys)
-
-            if not current_row:
-                current_row.append((polygon, text_info))
-                current_min_y, current_max_y = min_y, max_y
-                continue
-
-            # Check if the current element vertically overlaps with the previous row
-            overlaps = not (max_y < current_min_y - row_threshold or min_y > current_max_y + row_threshold)
-
-            if overlaps:
-                current_row.append((polygon, text_info))
-                current_min_y = min(current_min_y, min_y)
-                current_max_y = max(current_max_y, max_y)
-            else:
-                rows.append(current_row)
-                current_row = [(polygon, text_info)]
-                current_min_y, current_max_y = min_y, max_y
-
-        if current_row:
-            rows.append(current_row)
-
-        return rows
-
     def identify_columns(self, rows, col_threshold=5, row_limit=3):
         if not rows:
             return []
@@ -213,67 +181,43 @@ class TableDetector:
         print('Final merged columns after detection -----------> ', merged_columns)
         return merged_columns
 
-    def identify_columns_old(self, rows, col_threshold=10):
-        if not rows:
-            return []
-
-        first_row = rows[0]
-        sorted_row = sorted(first_row, key=lambda item: item[0][0][0])
+    def get_table_info(self):
         
-        columns = []
-        for polygon, _ in sorted_row:
-            x_left = min([point[0] for point in polygon])
-            x_right = max([point[0] for point in polygon])
-            columns.append((x_left, x_right))
+        header_row = self.rows[0]  # Take the first row as the header
+        sortedCol = sorted(self.columns, key=lambda x: x[0])
+        sortedRows = []
+        
+        for eachRow in self.rows:
+            eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
+            sortedRows.append(eachRow)
+            row_data = [''] * len(sortedCol)
+            for box, (text, conf) in eachRow:
+                x_min = min([pt[0] for pt in box])
+                x_max = max([pt[0] for pt in box])
+                x_center = (x_min + x_max) / 2
 
-        merged_columns = []
-        for col in sorted(columns, key=lambda c: c[0]):
-            if not merged_columns:
-                merged_columns.append(col)
-            else:
-                last = merged_columns[-1]
-                if col[0] - last[1] <= col_threshold:
-                    merged_columns[-1] = (last[0], max(last[1], col[1]))
-                else:
-                    merged_columns.append(col)
+                for idx, (col_start, col_end) in enumerate(sortedCol):
+                    if col_start <= x_center <= col_end:
+                        row_data[idx] = text
+                        break
+            print(f'Table detection values in sorted ----> {row_data} ' )
+            self.table_data.append(row_data)
+        print('Sorted Rows Table Header Info ---------> ', self.table_data )
+        
+        print('Sorted Col Table Header Info ---------> ', sortedCol )
+        for i, (cell, (key, confidence)) in enumerate(sortedRows[0]):
+            if i < len(sortedCol):
+                col_start, col_end = sortedCol[i]
+                self.table_header_info.append({
+                    "key": key.strip(),
+                    "position": i + 1,
+                    "coordinates": (col_start, col_end)
+                })
+        print('Table Header Info ---------> ',self.table_header_info )
+        # return table_header_info
 
-        return merged_columns
 
-    def identify_columns_v1(self, rows, col_threshold=15):
-        if not rows:
-            return []
-
-        column_positions = []
-
-        # Step 1: Collect x1-x2 positions of all items in all rows
-        for row in rows:
-            print('Rows before Polygon Detection  -------->...........' , rows)
-            for polygon, _ in row:
-                print('Row Polygon to print       -------->...........' , polygon)
-                x_left = min([point[0] for point in polygon])
-                x_right = max([point[0] for point in polygon])
-                column_positions.append((x_left, x_right))
-
-        # Step 2: Sort by left x position
-        column_positions.sort(key=lambda x: x[0])
-
-        # Step 3: Merge close columns
-        merged_columns = []
-        for col in column_positions:
-            if not merged_columns:
-                merged_columns.append(col)
-            else:
-                last = merged_columns[-1]
-                if col[0] - last[1] <= col_threshold:
-                    # Merge columns
-                    new_col = (min(last[0], col[0]), max(last[1], col[1]))
-                    merged_columns[-1] = new_col
-                else:
-                    merged_columns.append(col)
-
-        return merged_columns
-
-    def draw_grid(self, image):
+    def map_and_get_tableData(self, image):
         rows = self.rows
         columns = self.columns
         # print('Columns to Print ------> ', columns)
@@ -292,8 +236,12 @@ class TableDetector:
             y_bottom = int(rows[-1][0][0][0][1])
             print(f'columns start position begin {y_top} and end at {y_bottom}')
             cv2.line(image, (x1, y_top), (x1, y_bottom), (255, 0, 0), 3)
-
+        self.get_table_info()
         return image
+    
+
+    
+    
     
     def to_html(self):
         output_file=f"{self.file_name}_output_table.html"
@@ -325,6 +273,62 @@ class TableDetector:
                     processed_row.append(text.strip())
                 writer.writerow(processed_row)
         return output_file
+    
+    # def extract_table_data(self, table_cells: List[Dict], headers: List[str], header_coords: List[Tuple[int, int]]) -> List[List[str]]:
+    #     """
+    #     Extracts structured table data from OCR cell info and given headers.
+        
+    #     Args:
+    #         table_cells: List of cell dicts with keys: ['text', 'bbox'].
+    #         headers: The ordered list of header names.
+    #         header_coords: List of x-coordinate range (start_x, end_x) for each column header.
+        
+    #     Returns:
+    #         List of lists: structured rows including headers and corresponding row values.
+    #     """
+    #     table_data = [headers]
+    #     rows_by_y = {}
+
+    #     # Step 1: Group cells by Y-coordinate (rows)
+    #     for cell in table_cells:
+    #         x_min, y_min, x_max, y_max = cell['bbox']
+    #         text = cell['text'].strip()
+    #         row_key = (y_min + y_max) // 2  # approximate row center
+
+    #         if row_key not in rows_by_y:
+    #             rows_by_y[row_key] = []
+
+    #         rows_by_y[row_key].append({
+    #             "text": text,
+    #             "x_center": (x_min + x_max) // 2
+    #         })
+
+    #     # Step 2: Sort rows by their vertical position (top to bottom)
+    #     sorted_row_keys = sorted(rows_by_y.keys())
+    #     for row_key in sorted_row_keys:
+    #         row = rows_by_y[row_key]
+    #         row_cells = [""] * len(headers)
+
+    #         # Step 3: Match each cell to the correct column based on x_center
+    #         for cell in row:
+    #             x = cell["x_center"]
+    #             text = cell["text"]
+    #             for i, (x_start, x_end) in enumerate(header_coords):
+    #                 if x_start <= x <= x_end:
+    #                     row_cells[i] = text
+    #                     break
+
+    #         # Check if at least one column is non-empty before appending
+    #         if any(val != "" for val in row_cells):
+    #             table_data.append(row_cells)
+
+    #     return table_data
+
+    
+    
+    
+    
+    
     # def draw_table_cell(self, image, rows, columns):
     #     for row in rows:
     #         y_coords = [pt[0][1] for pt, _ in row]

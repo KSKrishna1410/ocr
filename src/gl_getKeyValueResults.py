@@ -111,7 +111,7 @@ def extract_text(image_path,doc_name,output_folder,keyMappingData):
     table_detector = TableDetector(flattened_result, doc_name)
     image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
     if is_table_cord:
-        table_detector.draw_grid(image_with_table)
+        table_detector.map_and_get_tableData(image_with_table)
         table_detector.to_html()
         table_detector.to_csv()
     # Step 3: Save the output image

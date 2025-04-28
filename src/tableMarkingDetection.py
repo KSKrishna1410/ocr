@@ -87,7 +87,7 @@ class TableDetector:
             lower_text = text.lower().strip()
             if any(kw == lower_text for kw in normalized_keywords):
                 top_y = max(p[1] for p in polygon)
-                if(top_y > self.table_start_y+50):
+                if(top_y > self.table_start_y+100):
                     matched_positions.append((top_y, text))
                     print(f"✅ Match found: '{text}' at top Y: {top_y}")
                 # break  # avoid duplicate matching for multiple keywords in one text

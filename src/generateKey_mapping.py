@@ -83,11 +83,11 @@ class documentClassifier:
 
         for row in reader:
             key, doc_text = row[0].strip(), row[1].strip()
-
-            if key not in key_mapping:
-                key_mapping[key] = [doc_text]
-            else:
-                key_mapping[key].append(doc_text)
+            if key != 'Others' :
+                if key not in key_mapping:
+                    key_mapping[key] = [doc_text]
+                else:
+                    key_mapping[key].append(doc_text)
             
             if doc_text not in all_keys:
                 all_keys.append(doc_text)

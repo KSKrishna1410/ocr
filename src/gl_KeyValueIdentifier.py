@@ -87,6 +87,7 @@ class DocumentAnalyzer:
         self.sftp_uploader = sftp_uploader
         self.doc_key_list_array = []
         self.doc_key_list = []
+        self.doc_text_lables = []
         self.keyValueData = []
         self.actual_doc_type = None
         # self.sortedOCRresult = []
@@ -106,7 +107,7 @@ class DocumentAnalyzer:
         #         text = word_info[1][0].strip()  # Extracted text
         #         confidence = word_info[1][1]  # Confidence score
         #         self.sortedOCRresult.append((text, bbox, confidence))
-        keyValueIdentifier = KeyValueIdentifierClass(self.sortedOCRresult,self.doc_key_list_array)
+        keyValueIdentifier = KeyValueIdentifierClass(self.sortedOCRresult,self.doc_key_list_array, self.doc_text_lables)
         # extracted_data = find_aligned_value(self.extracted_data, self.doc_key_list_array)
         self.keyValueData = keyValueIdentifier.getkey_extractedValues()
         save_extracted_data_remote(self.keyValueData, self.remote_path, self.doc_name)
@@ -115,6 +116,7 @@ class DocumentAnalyzer:
     def _classify_document(self):
         classifier = documentClassifier()
         self.actual_doc_type = classifier.classify_document(self.raw_text.encode("utf-8"))
+        self.doc_text_lables = classifier.invoice_keywords
         print(f"Extracted Document and Identified as {self.actual_doc_type}")
 
         if self.actual_doc_type in classifier.validDocument:
@@ -149,7 +151,7 @@ class DocumentAnalyzer:
 
 
 class KeyValueIdentifierClass:
-    def __init__(self, sortedOCRresult, key_info_list, y_tolerance=20):
+    def __init__(self, sortedOCRresult, key_info_list,doc_text_lables,  y_tolerance=20):
         self.sortedOCRresult = sortedOCRresult
         self.key_info_list = key_info_list
         self.y_tolerance = y_tolerance
@@ -157,9 +159,11 @@ class KeyValueIdentifierClass:
         self.values = []
         self.key_value_pairs = []
         self.used_value_bboxes = []
-        self.actual_bottom_threshold = 35  # Define your bottom threshold
+        self.doc_text_lables = doc_text_lables
+        self.actual_bottom_threshold = 25  # Define your bottom threshold
         self.y_align4_right = 20
-        self.x_align4_bottom = 35
+        self.x_align4_bottom = 25
+        print(f'Inside KeyValueIdentifierClass {doc_text_lables}')
         
     def categorize_data(self):
         # print("Key info list:", self.key_info_list)
@@ -187,13 +191,18 @@ class KeyValueIdentifierClass:
         
         closest_bbox = None
         for val_text, val_bbox in self.values:
+            if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
+                print('value in key , ----->' , val_text.lower())
+                continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values
             val_x1, val_y1 = val_bbox[0]
             val_x2, val_y2 = val_bbox[1]
 
             average = statistics.mean([key_x1, key_x2])
-            if val_x1 > average and abs(val_y1 - key_y1) <= self.x_align4_bottom:
+            if key_x2-10 <= val_x1  and key_y2 -5 <= val_y1 < key_y3 :
+            # if key_x1 <= val_x1 <= key_x2 and abs(val_y1 - key_y1) <= self.x_align4_bottom:
+            # if val_x1 > average and abs(val_y1 - key_y1) <= self.x_align4_bottom:
                 x_distance = val_x1 - key_x2
                 if x_distance < min_x_distance:
                     min_x_distance = x_distance
@@ -248,6 +257,8 @@ class KeyValueIdentifierClass:
         min_y_distance = float('inf')
         key_text = currentKey['standard_key']
         for val_text, val_bbox in self.values:
+            if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
+                continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values
 

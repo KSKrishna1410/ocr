@@ -41,6 +41,7 @@ RUN . /app/ppenv/bin/activate && \
         paddleocr \
         pdf2image \
         fuzzywuzzy \
+        python-Levenshtein \
         pandas \
         pillow \
         tabula-py \

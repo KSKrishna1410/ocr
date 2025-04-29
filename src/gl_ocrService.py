@@ -59,7 +59,7 @@ def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType):
         "document_type": docType.upper() if docType else None,
         "rawtext": '',
         "fileType": fileType,
-        "headerData": [],
+        "pageWiseData": [],
         "lineTabulaData": []
     }
 
@@ -81,12 +81,12 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 remote_path=remote_dir
             )
             extracted_data = analyzer.analyze_and_extract()
-            finalOutput["headerData"].append({
+            finalOutput["pageWiseData"].append({
                 "page": index + 1,
                 "identified_doc_type": analyzer.actual_doc_type,
                 "rawtext": ocr_extraction.raw_text,
-                "extractedData": extracted_data,
-                "lineDetails": analyzer.ppOCRTableData
+                "headerInfo": extracted_data,
+                "lineInfo": analyzer.ppOCRTableData
             })
 
             if isinstance(extracted_data, str):

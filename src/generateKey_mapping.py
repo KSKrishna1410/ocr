@@ -65,16 +65,17 @@ class documentClassifier:
         self.bank_key_mapping = {}
         self.bank_keywords = []
         self.validDocument = ['INVOICE', 'BANKSTMT' ]
-        
-        self._load_csv("/files/ocr_files/Invoice_keys.csv", self.invoice_key_mapping, self.invoice_keywords)
-        self._load_csv("/files/ocr_files/bankstmt_keys.csv", self.bank_key_mapping, self.bank_keywords)
+        self.invoiceMasterInfo = {}
+        self.bankMasterInfo = {}
+        self._load_csv("/files/ocr_files/Invoice_allkeys.csv", self.invoice_key_mapping, self.invoice_keywords, self.invoiceMasterInfo)
+        self._load_csv("/files/ocr_files/bankstmt_allkeys.csv", self.bank_key_mapping, self.bank_keywords, self.bankMasterInfo)
         self.doc_type_mapping = {
             'INVOICE': self.invoice_key_mapping,
             'BANKSTMT': self.bank_key_mapping
         }
         
         
-    def _load_csv(self, remote_csv_path, key_mapping, all_keys):
+    def _load_csv(self, remote_csv_path, key_mapping, all_keys, masterInfo):
         csv_bytes = read_file_from_sftp(remote_csv_path)
         csv_string = csv_bytes.decode("utf-8")
 
@@ -82,8 +83,8 @@ class documentClassifier:
         next(reader)  # Skip header
 
         for row in reader:
-            key, doc_text = row[0].strip(), row[1].strip()
-            if key != 'Others' :
+            key, doc_text,dataType, fieldType = row[0].strip(), row[1].strip(), row[2].strip(), row[3].strip()
+            if key != 'Others' and fieldType == 'Header' :
                 if key not in key_mapping:
                     key_mapping[key] = [doc_text]
                 else:
@@ -91,6 +92,17 @@ class documentClassifier:
             
             if doc_text not in all_keys:
                 all_keys.append(doc_text)
+            if  key not in masterInfo:
+                masterInfo[key] = {
+                        "key": key,
+                        "dataType": dataType,
+                        "fieldType": fieldType,
+                        "fieldKeys": ''
+                }
+        # print(f'Inside KeyValueIdentifierClass {key_mapping}')
+        for key, field_keys_list in key_mapping.items():
+            masterInfo[key]['fieldKeys'] = field_keys_list
+        print(f'Inside KeyValueIdentifierClass {masterInfo}')
                 
         
     def classify_document(self, text):
@@ -99,13 +111,13 @@ class documentClassifier:
         
         invoice_score = sum(1 for word in self.invoice_keywords if word.lower() in text.lower())
         bank_score = sum(1 for word in self.bank_keywords if word.lower() in text.lower())
-
-        if invoice_score > bank_score:
+        print(f'Document matched Invoice Score ---> {invoice_score} and Bank stmt score {bank_score}')
+        if 5 < invoice_score > bank_score:
             return "INVOICE"
-        elif bank_score > invoice_score:
+        elif 5 < bank_score > invoice_score:
             return "BANKSTMT"
         else:
-            return "Unknown"
+            return "UNKNOWN"
 
         
 

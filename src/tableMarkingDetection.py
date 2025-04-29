@@ -216,7 +216,6 @@ class TableDetector:
         print('Table Header Info ---------> ',self.table_header_info )
         # return table_header_info
 
-
     def map_and_get_tableData(self, image):
         rows = self.rows
         columns = self.columns
@@ -234,14 +233,9 @@ class TableDetector:
             x1, x2 = map(int, col)
             y_top = int(rows[0][0][0][0][1])
             y_bottom = int(rows[-1][0][0][0][1])
-            print(f'columns start position begin {y_top} and end at {y_bottom}')
             cv2.line(image, (x1, y_top), (x1, y_bottom), (255, 0, 0), 3)
         self.get_table_info()
         return image
-    
-
-    
-    
     
     def to_html(self):
         output_file=f"{self.file_name}_output_table.html"

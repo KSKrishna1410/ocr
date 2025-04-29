@@ -90,24 +90,21 @@ class DocumentAnalyzer:
         self.doc_text_lables = []
         self.keyValueData = []
         self.actual_doc_type = None
+        self.tablePosition = []
         # self.sortedOCRresult = []
         self.sortedOCRresult = [
             (line[1][0].strip(), line[0], line[1][1])
             for result in self.result for line in result
         ] #text, bbox, confidence in self.extracted_data
         self.ppOCRTableData = {}
+        self.documentMasterInfo = []
 
     def analyze_and_extract(self):
         self._classify_document()
-        self._draw_and_save_table()
+        if self.actual_doc_type == "INVOICE":
+            self._identify_and_extract_table()
         self._prepare_document_key_value_pairs()
-        # for line in self.result:
-        #     for word_info in line:
-        #         bbox = word_info[0]  # Bounding box
-        #         text = word_info[1][0].strip()  # Extracted text
-        #         confidence = word_info[1][1]  # Confidence score
-        #         self.sortedOCRresult.append((text, bbox, confidence))
-        keyValueIdentifier = KeyValueIdentifierClass(self.sortedOCRresult,self.doc_key_list_array, self.doc_text_lables)
+        keyValueIdentifier = KeyValueIdentifierClass(self.sortedOCRresult,self.doc_key_list_array, self.doc_text_lables, self.tablePosition,self.documentMasterInfo, self.actual_doc_type )
         # extracted_data = find_aligned_value(self.extracted_data, self.doc_key_list_array)
         self.keyValueData = keyValueIdentifier.getkey_extractedValues()
         save_extracted_data_remote(self.keyValueData, self.remote_path, self.doc_name)
@@ -116,13 +113,22 @@ class DocumentAnalyzer:
     def _classify_document(self):
         classifier = documentClassifier()
         self.actual_doc_type = classifier.classify_document(self.raw_text.encode("utf-8"))
-        self.doc_text_lables = classifier.invoice_keywords
+        if self.actual_doc_type == "INVOICE":
+            self.documentMasterInfo = classifier.invoiceMasterInfo
+            self.doc_text_lables = classifier.invoice_keywords
+        elif self.actual_doc_type == "BANKSTMT":
+            self.documentMasterInfo = classifier.bankMasterInfo
+            self.doc_text_lables = classifier.bank_keywords
+        else: 
+            self.doc_text_lables = []
+            
+            
         print(f"Extracted Document and Identified as {self.actual_doc_type}")
 
         if self.actual_doc_type in classifier.validDocument:
             self.key_mapping_data = classifier.doc_type_mapping.get(self.actual_doc_type, self.key_mapping_data)
 
-    def _draw_and_save_table(self):
+    def _identify_and_extract_table(self):
         flattened_result = [line for result in self.result for line in result]
 
         drawer = OCRBoxDrawer(self.image_path, flattened_result)
@@ -135,6 +141,7 @@ class DocumentAnalyzer:
             table_detector.map_and_get_tableData(image_with_table)
             self.ppOCRTableData['lineData'] = table_detector.table_data
             self.ppOCRTableData['tableInfo'] = table_detector.table_header_info
+            self.tablePosition = [[0, table_detector.table_start_y],[0, table_detector.table_end_y]]
             # table_detector.to_html()
             # table_detector.to_csv()
 
@@ -151,7 +158,7 @@ class DocumentAnalyzer:
 
 
 class KeyValueIdentifierClass:
-    def __init__(self, sortedOCRresult, key_info_list,doc_text_lables,  y_tolerance=20):
+    def __init__(self, sortedOCRresult, key_info_list,doc_text_lables, tablePosition,documentMasterInfo, docType, y_tolerance=20):
         self.sortedOCRresult = sortedOCRresult
         self.key_info_list = key_info_list
         self.y_tolerance = y_tolerance
@@ -162,8 +169,10 @@ class KeyValueIdentifierClass:
         self.doc_text_lables = doc_text_lables
         self.actual_bottom_threshold = 25  # Define your bottom threshold
         self.y_align4_right = 20
-        self.x_align4_bottom = 25
-        print(f'Inside KeyValueIdentifierClass {doc_text_lables}')
+        self.x_align4_bottom = 5
+        self.tablePosition = tablePosition
+        self.documentMasterInfo = documentMasterInfo
+        self.docType = docType
         
     def categorize_data(self):
         # print("Key info list:", self.key_info_list)
@@ -188,11 +197,10 @@ class KeyValueIdentifierClass:
         min_x_distance = float('inf')
         key_text = currentKey['standard_key']
         match_candidates = []
-        
+        dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 500
         closest_bbox = None
         for val_text, val_bbox in self.values:
             if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
-                print('value in key , ----->' , val_text.lower())
                 continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values
@@ -214,7 +222,7 @@ class KeyValueIdentifierClass:
                     existing_index = next((i for i, kv in enumerate(self.key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
-                    for threshold in range(100, 1601, 100):
+                    for threshold in range(100, dynamicThreshold, 100):
                         if closest_value and closest_distance < threshold:
                             if existing_index is None:
                                 self.key_value_pairs.append({
@@ -256,6 +264,7 @@ class KeyValueIdentifierClass:
         bottom_closest_value = None
         min_y_distance = float('inf')
         key_text = currentKey['standard_key']
+        print('Identify the value for ', key_text)
         for val_text, val_bbox in self.values:
             if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
                 continue
@@ -267,7 +276,7 @@ class KeyValueIdentifierClass:
             
             # ✅ Filter values directly below key within a tight vertical margin
             y_distance = val_y1 - key_y3
-            if not (0 < y_distance <= self.actual_bottom_threshold):
+            if not (-5 < y_distance <= self.actual_bottom_threshold):
                 continue
 
             # ✅ Check if it's horizontally aligned with the key
@@ -347,11 +356,23 @@ class KeyValueIdentifierClass:
 
     def getkey_extractedValues(self):
         self.categorize_data()
+        print( 'Feilds to Capture----> ', self.key_info_list )
         for eachKey in self.key_info_list:
-            if eachKey["key_bounding_box"] is not None and eachKey["value"] is None:
-                match_found = False
-                self.right_aligned(eachKey)
-                self.bottom_aligned(eachKey)
+            print( 'Getting Key details for these feilds ----> ', eachKey["standard_key"] )
+            keybbox = json.loads(eachKey["key_bounding_box"])
+            if keybbox is not None and eachKey["value"] is None :
+                if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double":
+                    if self.docType == 'INVOICE' and self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]:
+                        match_found = False
+                        self.right_aligned(eachKey)
+                        self.bottom_aligned(eachKey)
+                    elif self.docType != 'INVOICE':
+                        self.right_aligned(eachKey)
+                        continue
+                elif self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
+                    match_found = False
+                    self.right_aligned(eachKey)
+                # if keybbox is not None and eachKey["value"] is None and keybbox[0][1] < self.tablePosition[0][1]:
             elif eachKey["value"] is not None:
                 print(f"Colon match used for: '{eachKey['standard_key']}'")    
                 self.set_key_values(eachKey) #set colon Match values

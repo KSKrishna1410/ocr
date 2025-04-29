@@ -16,7 +16,7 @@ regex_check = [
     "pattern": "(?i)\bGST.*?(\d{1,2})\s*%"
   },
   {
-    "key": "GST Number",
+    "key": "GSTIN",
     "pattern": "\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}"
   }
 ]

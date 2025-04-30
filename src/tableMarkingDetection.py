@@ -193,7 +193,7 @@ class TableDetector:
         for eachRow in self.rows:
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
             sortedRows.append(eachRow)
-            row_data = [''] * len(sortedCol)
+            row_data = ['null'] * len(sortedCol)
             for box, (text, conf) in eachRow:
                 x_min = min([pt[0] for pt in box])
                 x_max = max([pt[0] for pt in box])

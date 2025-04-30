@@ -4,6 +4,7 @@ import csv
 import os
 import paramiko
 from typing import List, Tuple
+import re
 
 
 class OCRBoxDrawer:
@@ -35,7 +36,7 @@ class TableDetector:
     def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name):
         self.ocr_data = ocr_data
         self.keywords = ['Particulars','Package','item', 'description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 'net charges','discount','CGST','SGST','']
-        self.end_keywords = ['Round Off','Total', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
+        self.end_keywords = ['Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
@@ -76,7 +77,9 @@ class TableDetector:
         return None
     
     def detect_table_end(self):
-        normalized_keywords = [kw.lower().strip() for kw in self.end_keywords]
+        if self.table_start_y is None:
+            return None
+        normalized_keywords = [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in self.end_keywords]
         matched_positions = []
 
         print("🔍 Matching OCR items against end keywords...\n")
@@ -87,7 +90,7 @@ class TableDetector:
             lower_text = text.lower().strip()
             if any(kw == lower_text for kw in normalized_keywords):
                 top_y = max(p[1] for p in polygon)
-                if(top_y > self.table_start_y+100):
+                if(self.table_start_y != None and top_y > self.table_start_y+100):
                     matched_positions.append((top_y, text))
                     print(f"✅ Match found: '{text}' at top Y: {top_y}")
                 # break  # avoid duplicate matching for multiple keywords in one text
@@ -155,7 +158,7 @@ class TableDetector:
             return []
 
         column_positions = []
-        print('Inside table ---> ', rows)
+        print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[0]}')
         # Step 1: Analyze first N rows (or all rows)
         for row in rows[:row_limit]:
             for polygon, text in row:
@@ -173,7 +176,7 @@ class TableDetector:
                 merged_columns.append(col)
             else:
                 last = merged_columns[-1]
-                print(f'this is in the col check col[0]{col[0]} and the last {last[1]} ')
+                # print(f'this is in the col check col[0]{col[0]} and the last {last[1]} ')
                 if col[0] - last[1] <= col_threshold:
                     merged_columns[-1] = (min(last[0], col[0]), max(last[1], col[1]))
                 else:

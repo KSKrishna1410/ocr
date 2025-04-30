@@ -361,18 +361,32 @@ class KeyValueIdentifierClass:
             print( 'Getting Key details for these feilds ----> ', eachKey["standard_key"] )
             keybbox = json.loads(eachKey["key_bounding_box"])
             if keybbox is not None and eachKey["value"] is None :
-                if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double":
-                    if self.docType == 'INVOICE' and self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]:
-                        match_found = False
-                        self.right_aligned(eachKey)
-                        self.bottom_aligned(eachKey)
-                    elif self.docType != 'INVOICE':
-                        self.right_aligned(eachKey)
-                        continue
-                elif self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
-                    match_found = False
+                if self.docType == 'INVOICE':
+                    if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double": # Non decimal
+                        if self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]: # above table position item
+                            self.right_aligned(eachKey)
+                            self.bottom_aligned(eachKey)
+                    else :
+                        if self.tablePosition and keybbox[0][1]-40 > self.tablePosition[0][1]: # For Decimals Below table position item
+                            self.right_aligned(eachKey)
+                            self.bottom_aligned(eachKey)
+                else :
                     self.right_aligned(eachKey)
-                # if keybbox is not None and eachKey["value"] is None and keybbox[0][1] < self.tablePosition[0][1]:
+                
+                
+                
+                # if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double":
+                #     if self.docType == 'INVOICE' and self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]:
+                #         match_found = False
+                #         self.right_aligned(eachKey)
+                #         self.bottom_aligned(eachKey)
+                #     elif self.docType != 'INVOICE':
+                #         self.right_aligned(eachKey)
+                #         continue
+                # elif self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
+                #     match_found = False
+                #     self.right_aligned(eachKey)
+                # # if keybbox is not None and eachKey["value"] is None and keybbox[0][1] < self.tablePosition[0][1]:
             elif eachKey["value"] is not None:
                 print(f"Colon match used for: '{eachKey['standard_key']}'")    
                 self.set_key_values(eachKey) #set colon Match values

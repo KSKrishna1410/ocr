@@ -29,10 +29,12 @@ def processOcr(folder_path, docType, file, uniqueId):
         bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
     else:
         bank_name = None
-
+    
     if file.lower().endswith(".pdf"):
         tableInfo = handle_tabular_data(folder_path, file, remote_dir, docType, bank_name)
         finalOutput["lineTabulaData"] = tableInfo
+        # if len(tableInfo) > 2:
+        #     finalOutput["pageWiseData"][0]['lineInfo']['lineData'] = tableInfo
 
     upload_results(remote_dir, file_name, finalOutput)
     return finalize_output(finalOutput)
@@ -88,7 +90,7 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 "headerInfo": extracted_data,
                 "lineInfo": analyzer.ppOCRTableData
             })
-
+            # ppOCRTableData['lineData']
             if isinstance(extracted_data, str):
                 extracted_data = json.loads(extracted_data)
 

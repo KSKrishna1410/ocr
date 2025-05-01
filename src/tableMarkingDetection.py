@@ -33,13 +33,14 @@ class OCRBoxDrawer:
 
 class TableDetector:
 
-    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name):
+    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables):
         self.ocr_data = ocr_data
         self.keywords = ['Particulars','Package','item', 'description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 'net charges','discount','CGST','SGST','']
         self.end_keywords = ['Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
+        self.doc_text_lables = doc_text_lables
         # self.columns = self.identify_columns()
         # self.rows = self.identify_rows()
 
@@ -51,6 +52,8 @@ class TableDetector:
         ]
 
         self.rows = self.identify_rows(self.table_elements)
+        self.mergedRows = []
+        # self.mergedRows = self.merge_wrapped_text_rows(self.table_elements)
         self.columns = self.identify_columns(self.rows)
         self.table_cord = ''
         self.table_data = []
@@ -74,6 +77,9 @@ class TableDetector:
             if lower_text in [kw.lower() for kw in self.end_keywords]:
                 y_end = max(p[1] for p in polygon)
                 return y_end
+            elif re.search(r'(?i)rupees\s+.+?\s+only', text):
+                y_end = max(p[1] for p in polygon)
+                return y_end
         return None
     
     def detect_table_end(self):
@@ -93,6 +99,11 @@ class TableDetector:
                 if(self.table_start_y != None and top_y > self.table_start_y+100):
                     matched_positions.append((top_y, text))
                     print(f"✅ Match found: '{text}' at top Y: {top_y}")
+            elif re.search(r'(?i)rupees\s+.+?\s+only', text):
+                top_y = max(p[1] for p in polygon)
+                if(self.table_start_y != None and top_y > self.table_start_y+100):
+                    matched_positions.append((top_y, text))
+                    print(f"✅ Match found with Rupee Pattern: '{text}' at top Y: {top_y}")
                 # break  # avoid duplicate matching for multiple keywords in one text
 
         if matched_positions:
@@ -137,6 +148,7 @@ class TableDetector:
 
     # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical space than single-line headers, and the Y-position comparison logic assumes uniform height.
     def identify_rows(self, table_elements, row_threshold=10):
+        print('Sorted Elements -----------> ' , table_elements)
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
         rows = []
         current_row = []
@@ -153,11 +165,38 @@ class TableDetector:
             rows.append(current_row)
         return rows
     
-    def identify_columns(self, rows, col_threshold=5, row_limit=3):
+    def merge_wrapped_text_rows(self, table_elements, vertical_gap_thresh=10):
+        boxes = sorted(table_elements, key=lambda b: b['y1'])  # Top to bottom
+        merged_rows = []
+
+        current_group = [boxes[0]]
+        for b in boxes[1:]:
+            prev = current_group[-1]
+            same_col = abs(b['x1'] - prev['x1']) < 10  # Tweak if needed
+            vertical_gap = b['y1'] - prev['y2']
+
+            if same_col and vertical_gap <= vertical_gap_thresh:
+                current_group.append(b)
+            else:
+                merged_text = ' '.join([i['text'] for i in current_group])
+                merged_rows.append({'text': merged_text, 'x1': current_group[0]['x1'],
+                                    'y1': current_group[0]['y1'], 'x2': current_group[-1]['x2'], 'y2': current_group[-1]['y2']})
+                current_group = [b]
+
+        # Add last group
+        if current_group:
+            merged_text = ' '.join([i['text'] for i in current_group])
+            merged_rows.append({'text': merged_text, 'x1': current_group[0]['x1'],
+                                'y1': current_group[0]['y1'], 'x2': current_group[-1]['x2'], 'y2': current_group[-1]['y2']})
+
+        return merged_rows
+    
+    def identify_columns(self, rows, col_threshold=10, row_limit=3):
         if not rows:
             return []
 
         column_positions = []
+        print(f'🏁 Identified Merged Rows ---> {len(self.mergedRows)} and the row header is {self.mergedRows}')
         print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[0]}')
         # Step 1: Analyze first N rows (or all rows)
         for row in rows[:row_limit]:
@@ -185,12 +224,11 @@ class TableDetector:
         return merged_columns
 
     def get_table_info(self):
-        
         header_row = self.rows[0]  # Take the first row as the header
         sortedCol = sorted(self.columns, key=lambda x: x[0])
         sortedRows = []
-        
-        for eachRow in self.rows:
+        for ridx, eachRow in enumerate(self.rows):
+            rowItem = True
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
             sortedRows.append(eachRow)
             row_data = ['null'] * len(sortedCol)
@@ -198,13 +236,33 @@ class TableDetector:
                 x_min = min([pt[0] for pt in box])
                 x_max = max([pt[0] for pt in box])
                 x_center = (x_min + x_max) / 2
-
+                # if text.lower() in [kw.lower().strip() for kw in ['CGST @ 9%','SGST @ 9%','Total']]:
+                if text.lower() in [kw.lower().strip() for kw in self.doc_text_lables]:
+                    rowItem = False
                 for idx, (col_start, col_end) in enumerate(sortedCol):
                     if col_start <= x_center <= col_end:
                         row_data[idx] = text
                         break
-            print(f'Table detection values in sorted ----> {row_data} ' )
-            self.table_data.append(row_data)
+                non_null_count = sum(1 for item in row_data if item != 'null')
+            print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem} for Index row {ridx} and non_null_count is {non_null_count}' )
+            if ridx < 2 and len(self.table_data) > 0 and rowItem == False:
+                for eidx, eachCell in enumerate(row_data):
+                    if self.table_data[0][eidx] == 'null' and eachCell != 'null':
+                        self.table_data[0][eidx] = eachCell
+                    elif eachCell != 'null':
+                        self.table_data[0][eidx] = self.table_data[0][eidx] + ' ' + eachCell
+                continue
+            # elif non_null_count < 3 and len(self.table_data) > 0:
+            #     lastRowItemIdx = len(self.table_data)-1
+            #     print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
+            #     for eidx, eachCell in enumerate(row_data):
+            #         if eachCell != 'null':
+            #             self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+            #     continue
+            if ridx > 2:
+                if rowItem :
+                    self.table_data.append(row_data)
+            else: self.table_data.append(row_data)
         print('Sorted Rows Table Header Info ---------> ', self.table_data )
         
         print('Sorted Col Table Header Info ---------> ', sortedCol )

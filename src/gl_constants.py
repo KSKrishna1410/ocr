@@ -18,6 +18,10 @@ regex_check = [
   {
     "key": "GSTIN",
     "pattern": "\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}"
+  },
+  {
+    "key": "HSN",
+    "pattern": "(?i)(?:sac|hsn)\s*code[:\-]?\s*(\d{4,8})"
   }
 ]
 

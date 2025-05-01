@@ -222,7 +222,7 @@ async def upload_csv(file: UploadFile = File(...), document_type: Literal["INVOI
         raise HTTPException(status_code=400, detail="Invalid document_type. Must be 'INVOICE' or 'BANKSTMT'.")
 
     # Set the filename
-    filename = "Invoice_keys.csv" if document_type == "INVOICE" else "Bankstmt_keys.csv"
+    filename = "Invoice_allkeys.csv" if document_type == "INVOICE" else "Bankstmt_allkeys.csv"
     SFTP_HOST = os.getenv("SFTP_HOST")
     SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
     SFTP_USERNAME = os.getenv("SFTP_USERNAME")

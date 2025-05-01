@@ -12,7 +12,7 @@ from fuzzywuzzy import fuzz, process
 from paddleocr import PaddleOCR, draw_ocr
 
 from src.getKeys4OCRobj import getKeylist
-from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
+from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote, cleanedText
 from src.tableMarkingDetection import OCRBoxDrawer, TableDetector
 from src.generateKey_mapping import documentClassifier, generate_key_mapping_remote
 
@@ -134,7 +134,7 @@ class DocumentAnalyzer:
         drawer = OCRBoxDrawer(self.image_path, flattened_result)
         image_with_boxes = drawer.draw_boxes()
 
-        table_detector = TableDetector(flattened_result, self.doc_name)
+        table_detector = TableDetector(flattened_result, self.doc_name, self.doc_text_lables)
         image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
 
         if is_table_cord:
@@ -173,6 +173,7 @@ class KeyValueIdentifierClass:
         self.tablePosition = tablePosition
         self.documentMasterInfo = documentMasterInfo
         self.docType = docType
+    
         
     def categorize_data(self):
         # print("Key info list:", self.key_info_list)
@@ -200,7 +201,8 @@ class KeyValueIdentifierClass:
         dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 500
         closest_bbox = None
         for val_text, val_bbox in self.values:
-            if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
+            normalized_text = cleanedText(val_text)
+            if normalized_text in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in self.doc_text_lables]:
                 continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values
@@ -266,7 +268,8 @@ class KeyValueIdentifierClass:
         key_text = currentKey['standard_key']
         print('Identify the value for ', key_text)
         for val_text, val_bbox in self.values:
-            if val_text.lower() in [k.lower() for k in self.doc_text_lables]:
+            normalized_text = cleanedText(val_text)
+            if normalized_text in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in self.doc_text_lables]:
                 continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values

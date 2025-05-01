@@ -126,6 +126,10 @@ def normalize(text):
 
     return re.sub(r"\s+", "", str(text).strip().lower())
 
+def cleanedText(text):
+    # return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
+    return re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
+
 # def is_header_row(row,expected_headers):
 #     return sum(1 for keyword in expected_headers if any(keyword.lower() in str(cell).lower() for cell in row)) >= len(expected_headers) - 2
 

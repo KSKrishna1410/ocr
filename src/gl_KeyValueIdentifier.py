@@ -146,7 +146,8 @@ class DocumentAnalyzer:
             # table_detector.to_csv()
 
         output_image = f"{self.doc_name}_annotated.png"
-        cv2.imwrite(output_image, image_with_table)
+        file_path = os.path.join('document', output_image)
+        cv2.imwrite(file_path, image_with_table)
         with open(output_image, 'rb') as f:
             image_content = f.read()
         self.sftp_uploader(image_content, output_image, self.remote_path)
@@ -167,7 +168,7 @@ class KeyValueIdentifierClass:
         self.key_value_pairs = []
         self.used_value_bboxes = []
         self.doc_text_lables = doc_text_lables
-        self.actual_bottom_threshold = 25  # Define your bottom threshold
+        self.actual_bottom_threshold = 30  # Define your bottom threshold
         self.y_align4_right = 20
         self.x_align4_bottom = 5
         self.tablePosition = tablePosition

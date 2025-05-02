@@ -36,7 +36,7 @@ class TableDetector:
     def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables):
         self.ocr_data = ocr_data
         self.keywords = ['Particulars','Package','item', 'description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 'net charges','discount','CGST','SGST','']
-        self.end_keywords = ['Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
+        self.end_keywords = ['Tax Summary','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
@@ -63,10 +63,10 @@ class TableDetector:
         sorted_data = sorted(self.ocr_data, key=lambda item: min(p[1] for p in item[0]))
         # print('Sorted OCR Data ---->  ', sorted_data )
         for polygon, (text, conf) in sorted_data:
-            lower_text = text.lower()
-            if any(kw == lower_text for kw in self.keywords):
+            lower_text = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
+            if lower_text !='' and lower_text != None and  any(kw.lower().strip() == lower_text for kw in self.keywords):
                 y_start = min(p[1] for p in polygon)
-                print('Table start detected  - at - ',y_start)
+                print(f'Table start detected  - at - {y_start} with Matched Keyword {lower_text}')
                 return y_start
         return None
 
@@ -93,7 +93,7 @@ class TableDetector:
         for polygon, (text, conf) in self.ocr_data:
             if not text or not polygon:
                 continue
-            lower_text = text.lower().strip()
+            lower_text = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
             if any(kw == lower_text for kw in normalized_keywords):
                 top_y = max(p[1] for p in polygon)
                 if(self.table_start_y != None and top_y > self.table_start_y+100):
@@ -147,7 +147,7 @@ class TableDetector:
         return image, is_table_detected
 
     # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical space than single-line headers, and the Y-position comparison logic assumes uniform height.
-    def identify_rows(self, table_elements, row_threshold=10):
+    def identify_rows(self, table_elements, row_threshold=30):
         print('Sorted Elements -----------> ' , table_elements)
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
         rows = []
@@ -197,9 +197,10 @@ class TableDetector:
 
         column_positions = []
         print(f'🏁 Identified Merged Rows ---> {len(self.mergedRows)} and the row header is {self.mergedRows}')
-        print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[0]}')
+        # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
         # Step 1: Analyze first N rows (or all rows)
         for row in rows[:row_limit]:
+            print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
             for polygon, text in row:
                 x_left = min([pt[0] for pt in polygon])
                 x_right = max([pt[0] for pt in polygon])

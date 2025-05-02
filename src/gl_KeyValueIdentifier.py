@@ -146,9 +146,9 @@ class DocumentAnalyzer:
             # table_detector.to_csv()
 
         output_image = f"{self.doc_name}_annotated.png"
-        file_path = os.path.join('document', output_image)
-        cv2.imwrite(file_path, image_with_table)
-        with open(output_image, 'rb') as f:
+        annotated_file_path = os.path.join('document', output_image)
+        cv2.imwrite(annotated_file_path, image_with_table)
+        with open(annotated_file_path, 'rb') as f:
             image_content = f.read()
         self.sftp_uploader(image_content, output_image, self.remote_path)
 

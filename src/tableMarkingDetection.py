@@ -77,9 +77,6 @@ class TableDetector:
             if lower_text in [kw.lower() for kw in self.end_keywords]:
                 y_end = max(p[1] for p in polygon)
                 return y_end
-            elif re.search(r'(?i)rupees\s+.+?\s+only', text):
-                y_end = max(p[1] for p in polygon)
-                return y_end
         return None
     
     def detect_table_end(self):
@@ -147,8 +144,7 @@ class TableDetector:
         return image, is_table_detected
 
     # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical space than single-line headers, and the Y-position comparison logic assumes uniform height.
-    def identify_rows(self, table_elements, row_threshold=30):
-        print('Sorted Elements -----------> ' , table_elements)
+    def identify_rows(self, table_elements, row_threshold=10):
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
         rows = []
         current_row = []

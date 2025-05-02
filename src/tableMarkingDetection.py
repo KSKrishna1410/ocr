@@ -36,7 +36,9 @@ class TableDetector:
     def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables):
         self.ocr_data = ocr_data
         self.keywords = ['Particulars','Package','item', 'description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 'net charges','discount','CGST','SGST','']
-        self.end_keywords = ['Tax Summary','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total','Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
+        self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
+                             'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
+        self.exclude_list = ['9%', '18%', '123']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
@@ -224,6 +226,11 @@ class TableDetector:
         header_row = self.rows[0]  # Take the first row as the header
         sortedCol = sorted(self.columns, key=lambda x: x[0])
         sortedRows = []
+        filtered_labels = [
+            kw.lower().strip()
+            for kw in self.doc_text_lables
+            if kw.strip() not in self.exclude_list
+        ]
         for ridx, eachRow in enumerate(self.rows):
             rowItem = True
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
@@ -234,7 +241,7 @@ class TableDetector:
                 x_max = max([pt[0] for pt in box])
                 x_center = (x_min + x_max) / 2
                 # if text.lower() in [kw.lower().strip() for kw in ['CGST @ 9%','SGST @ 9%','Total']]:
-                if text.lower() in [kw.lower().strip() for kw in self.doc_text_lables]:
+                if text.lower().strip() in filtered_labels:
                     rowItem = False
                 for idx, (col_start, col_end) in enumerate(sortedCol):
                     if col_start <= x_center <= col_end:
@@ -249,13 +256,13 @@ class TableDetector:
                     elif eachCell != 'null':
                         self.table_data[0][eidx] = self.table_data[0][eidx] + ' ' + eachCell
                 continue
-            # elif non_null_count < 3 and len(self.table_data) > 0:
-            #     lastRowItemIdx = len(self.table_data)-1
-            #     print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
-            #     for eidx, eachCell in enumerate(row_data):
-            #         if eachCell != 'null':
-            #             self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
-            #     continue
+            elif non_null_count < 3 and len(self.table_data) > 0 and rowItem:
+                lastRowItemIdx = len(self.table_data)-1
+                # print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
+                for eidx, eachCell in enumerate(row_data):
+                    if eachCell != 'null':
+                        self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+                continue
             if ridx > 2:
                 if rowItem :
                     self.table_data.append(row_data)

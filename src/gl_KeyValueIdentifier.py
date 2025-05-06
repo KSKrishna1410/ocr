@@ -153,7 +153,7 @@ class DocumentAnalyzer:
         self.sftp_uploader(image_content, output_image, self.remote_path)
 
     def _prepare_document_key_value_pairs(self):
-        self.doc_key_list_array = getKeylist(self.result, self.key_mapping_data)
+        self.doc_key_list_array = getKeylist(self.result, self.key_mapping_data, self.doc_text_lables)
         for key in self.doc_key_list_array:
             self.doc_key_list.append(key['key'])
 
@@ -360,7 +360,6 @@ class KeyValueIdentifierClass:
 
     def getkey_extractedValues(self):
         self.categorize_data()
-        print( 'Feilds to Capture----> ', self.key_info_list )
         for eachKey in self.key_info_list:
             print( 'Getting Key details for these feilds ----> ', eachKey["standard_key"] )
             keybbox = json.loads(eachKey["key_bounding_box"])

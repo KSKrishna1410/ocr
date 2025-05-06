@@ -99,7 +99,6 @@ class documentClassifier:
                         "fieldType": fieldType,
                         "fieldKeys": ''
                 }
-        # print(f'Inside KeyValueIdentifierClass {key_mapping}')
         for key, field_keys_list in key_mapping.items():
             masterInfo[key]['fieldKeys'] = field_keys_list
         # print(f'Inside KeyValueIdentifierClass {masterInfo}')

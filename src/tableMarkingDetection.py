@@ -35,9 +35,11 @@ class TableDetector:
 
     def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables):
         self.ocr_data = ocr_data
-        self.keywords = ['Particulars','Package','item', 'description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 'net charges','discount','CGST','SGST','']
+        self.start_keywords = ['Particulars','Package','item', 'CATEGORY','(Rs.)','description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 
+                               'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess',
+                                'sr', 'no.', 'tax', 'items', 'purchased', 'value']
         self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
-                             'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total']
+                             'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total', 'Item Total']
         self.exclude_list = ['9%', '18%', '123']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
@@ -66,7 +68,7 @@ class TableDetector:
         # print('Sorted OCR Data ---->  ', sorted_data )
         for polygon, (text, conf) in sorted_data:
             lower_text = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
-            if lower_text !='' and lower_text != None and  any(kw.lower().strip() == lower_text for kw in self.keywords):
+            if lower_text !='' and lower_text != None and  any(kw.lower().strip() == lower_text for kw in self.start_keywords):
                 y_start = min(p[1] for p in polygon)
                 print(f'Table start detected  - at - {y_start} with Matched Keyword {lower_text}')
                 return y_start
@@ -148,6 +150,7 @@ class TableDetector:
     # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical space than single-line headers, and the Y-position comparison logic assumes uniform height.
     def identify_rows(self, table_elements, row_threshold=10):
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
+        print('Inside Identify_rows ----------------> ', sorted_data)
         rows = []
         current_row = []
         last_y = None
@@ -161,33 +164,99 @@ class TableDetector:
             last_y = y_top
         if current_row:
             rows.append(current_row)
+        
+        headerRow= []
+        for eachRow in rows[:5]:
+            row_matched = self.is_headertext(eachRow)
+            if row_matched:
+                headerRow.append(eachRow)
+        
+        # Merge the extracted rows
+        print('--------------------------------')
+        print(headerRow)
+        print('--------------------------------')
+        merged_row = self.identify_Merged_rows(headerRow)
+        
+        # Remove the extracted rows from the original list
+        if len(merged_row) >0 :
+            for row in headerRow:
+                rows.remove(row)
+            rows.insert(0, merged_row)
         return rows
     
-    def merge_wrapped_text_rows(self, table_elements, vertical_gap_thresh=10):
-        boxes = sorted(table_elements, key=lambda b: b['y1'])  # Top to bottom
-        merged_rows = []
+    def identify_Merged_rows(self, ocr_data):
+        # Step 1: Group cells by approximate column (based on x-coordinates)
+        def get_avg_x(bbox):
+            return (bbox[0][0] + bbox[1][0] + bbox[2][0] + bbox[3][0]) / 4
 
-        current_group = [boxes[0]]
-        for b in boxes[1:]:
-            prev = current_group[-1]
-            same_col = abs(b['x1'] - prev['x1']) < 10  # Tweak if needed
-            vertical_gap = b['y1'] - prev['y2']
+        # Collect all cells with their row index and calculate their average x-coordinate
+        cells = []
+        for row_idx, row in enumerate(ocr_data):
+            for cell in row:
+                bbox, (text, conf) = cell
+                avg_x = get_avg_x(bbox)
+                cells.append((avg_x, bbox, text, conf, row_idx))
 
-            if same_col and vertical_gap <= vertical_gap_thresh:
-                current_group.append(b)
+        # Sort cells by avg_x to group by columns
+        cells.sort(key=lambda x: x[0])
+
+        # Group cells into columns based on x-coordinate proximity
+        columns = []
+        current_column = []
+        last_x = None
+        x_threshold = 50  # Adjusted to separate cells appropriately
+
+        for cell in cells:
+            avg_x, bbox, text, conf, row_idx = cell
+            if last_x is None or abs(avg_x - last_x) < x_threshold:
+                current_column.append((bbox, text, conf, row_idx))
             else:
-                merged_text = ' '.join([i['text'] for i in current_group])
-                merged_rows.append({'text': merged_text, 'x1': current_group[0]['x1'],
-                                    'y1': current_group[0]['y1'], 'x2': current_group[-1]['x2'], 'y2': current_group[-1]['y2']})
-                current_group = [b]
+                columns.append(current_column)
+                current_column = [(bbox, text, conf, row_idx)]
+            last_x = avg_x
 
-        # Add last group
-        if current_group:
-            merged_text = ' '.join([i['text'] for i in current_group])
-            merged_rows.append({'text': merged_text, 'x1': current_group[0]['x1'],
-                                'y1': current_group[0]['y1'], 'x2': current_group[-1]['x2'], 'y2': current_group[-1]['y2']})
+        if current_column:
+            columns.append(current_column)
 
-        return merged_rows
+        # Step 2: Merge cells within each column
+        merged_row = []
+        for column in columns:
+            if not column:
+                continue
+            
+            # Sort by y-coordinate (top-left y) to maintain top-to-bottom order
+            column.sort(key=lambda x: x[0][0][1])
+            
+            # Merge text
+            merged_text = " ".join(cell[1] for cell in column)
+            
+            # Take confidence from the first cell (based on y-order)
+            merged_conf = column[0][2]
+            
+            # Merge bounding boxes
+            bboxes = [cell[0] for cell in column]
+            min_x1 = min(bbox[0][0] for bbox in bboxes)  # min x1
+            min_y1 = min(bbox[0][1] for bbox in bboxes)  # min y1
+            max_x2 = max(bbox[1][0] for bbox in bboxes)  # max x2
+            min_y2 = min(bbox[1][1] for bbox in bboxes)  # min y2
+            max_x3 = max(bbox[2][0] for bbox in bboxes)  # max x3
+            max_y3 = max(bbox[2][1] for bbox in bboxes)  # max y3
+            min_x4 = min(bbox[3][0] for bbox in bboxes)  # min x4
+            max_y4 = max(bbox[3][1] for bbox in bboxes)  # max y4
+            
+            merged_bbox = [
+                [min_x1, min_y1],
+                [max_x2, min_y2],
+                [max_x3, max_y3],
+                [min_x4, max_y4]
+            ]
+            
+            merged_row.append((merged_bbox, (merged_text, merged_conf)))
+
+        # Step 3: Sort merged_row by min_x1 to maintain left-to-right order
+        merged_row.sort(key=lambda x: x[0][0][0])
+        
+        return merged_row
     
     def identify_columns(self, rows, col_threshold=10, row_limit=3):
         if not rows:
@@ -222,6 +291,48 @@ class TableDetector:
         print('Final merged columns after detection -----------> ', merged_columns)
         return merged_columns
 
+    def is_headertext(self, rowItem):
+        start_keywords_set = set(kw.strip().lower() for kw in self.start_keywords)
+        matched_count = 0
+        total_items = len(rowItem)
+        # print("Exact Match Results:")
+        # print("---------------------")
+        for rcnt, (_, (text, _)) in enumerate(rowItem):
+        # for rcnt, (val) in enumerate(rowItem):
+            cleaned_text = text.strip().lower()
+            if cleaned_text in start_keywords_set:
+                matched_count += 1
+
+        # Compute Match Score
+        match_score = matched_count / total_items if total_items > 0 else 0
+        print("\nHeader match count Total Matches:", matched_count)
+        # print("Match Score:", f"{match_score:.2f}")
+        if matched_count >=1:
+            return True
+        else: 
+            return False
+    
+    def identify_as_headerRow(self, rowItem):
+        start_keywords_set = set(kw.strip().lower() for kw in self.start_keywords)
+        matched_count = 0
+        total_items = len(rowItem)
+        # print("Exact Match Results:")
+        # print("---------------------")
+        # for rcnt, (_, (text, _)) in enumerate(rowItem):
+        for rcnt, (val) in enumerate(rowItem):
+            cleaned_text = val.strip().lower()
+            if cleaned_text in start_keywords_set:
+                matched_count += 1
+
+        # Compute Match Score
+        match_score = matched_count / total_items if total_items > 0 else 0
+        print("\nTotal Matches:", matched_count)
+        # print("Match Score:", f"{match_score:.2f}")
+        if matched_count >=1:
+            return True
+        else: 
+            return False
+
     def get_table_info(self):
         header_row = self.rows[0]  # Take the first row as the header
         sortedCol = sorted(self.columns, key=lambda x: x[0])
@@ -231,7 +342,10 @@ class TableDetector:
             for kw in self.doc_text_lables
             if kw.strip() not in self.exclude_list
         ]
+        print("---------------------")
         for ridx, eachRow in enumerate(self.rows):
+            if len(self.rows)-1 == ridx:
+                continue # To Skip the last row item from the Detected Table element
             rowItem = True
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
             sortedRows.append(eachRow)
@@ -248,25 +362,32 @@ class TableDetector:
                         row_data[idx] = text
                         break
                 non_null_count = sum(1 for item in row_data if item != 'null')
-            print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem} for Index row {ridx} and non_null_count is {non_null_count}' )
-            if ridx < 2 and len(self.table_data) > 0 and rowItem == False:
+            is_Header_row = self.identify_as_headerRow(row_data)
+            print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem}  and Header Identifiction as {is_Header_row} for Index row {ridx} and non_null_count is {non_null_count}' )
+            # if ridx < 2 and len(self.table_data) > 0 and rowItem == False :
+            if is_Header_row and len(self.table_data) > 0 and rowItem == False :
                 for eidx, eachCell in enumerate(row_data):
                     if self.table_data[0][eidx] == 'null' and eachCell != 'null':
                         self.table_data[0][eidx] = eachCell
                     elif eachCell != 'null':
                         self.table_data[0][eidx] = self.table_data[0][eidx] + ' ' + eachCell
                 continue
-            elif non_null_count < 3 and len(self.table_data) > 0 and rowItem:
+            elif non_null_count <= 2 and len(self.table_data) > 0 and rowItem:
                 lastRowItemIdx = len(self.table_data)-1
+                is_LastItem_Header_row = self.identify_as_headerRow(self.table_data[lastRowItemIdx])
                 # print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
-                for eidx, eachCell in enumerate(row_data):
-                    if eachCell != 'null':
-                        self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
-                continue
+                if is_LastItem_Header_row == False:
+                    for eidx, eachCell in enumerate(row_data):
+                        if eachCell != 'null' and eidx <= len(row_data)/2:
+                            self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+                    continue
+                # else:
+                #     self.table_data.append(row_data)
             if ridx > 2:
                 if rowItem :
                     self.table_data.append(row_data)
             else: self.table_data.append(row_data)
+        print("---------------------")
         print('Sorted Rows Table Header Info ---------> ', self.table_data )
         
         print('Sorted Col Table Header Info ---------> ', sortedCol )

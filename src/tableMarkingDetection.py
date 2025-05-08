@@ -277,7 +277,7 @@ class TableDetector:
         headerRow = rows[0]
         print('Identify the Col position for ######################' , headerRow)
         for ridx , (polygon, (text, conf)) in enumerate(headerRow):
-            if text in self.wrapKeys:
+            if text in self.wrapKeys and ridx >0:
                 print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
                 prvPoly, text = headerRow[ridx-1]
                 x_left = max([pt[0] for pt in prvPoly])
@@ -321,6 +321,7 @@ class TableDetector:
         print('🏁 Identified Merged Columns positions ------> ', merged_columns)
         new_column_positions[len(new_column_positions)-1] = merged_columns[len(merged_columns)-1]
         return new_column_positions
+        # return merged_columns
 
     def find_wrap_keys_in_headers(self,header_rows):
         """

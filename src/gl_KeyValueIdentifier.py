@@ -122,11 +122,11 @@ class DocumentAnalyzer:
         else: 
             self.doc_text_lables = []
             
-            
         print(f"Extracted Document and Identified as {self.actual_doc_type}")
 
         if self.actual_doc_type in classifier.validDocument:
             self.key_mapping_data = classifier.doc_type_mapping.get(self.actual_doc_type, self.key_mapping_data)
+        print(f"Extracted Document and Identified as {self.actual_doc_type} and {self.key_mapping_data}")
 
     def _identify_and_extract_table(self):
         flattened_result = [line for result in self.result for line in result]
@@ -134,13 +134,14 @@ class DocumentAnalyzer:
         drawer = OCRBoxDrawer(self.image_path, flattened_result)
         image_with_boxes = drawer.draw_boxes()
 
-        table_detector = TableDetector(flattened_result, self.doc_name, self.doc_text_lables)
+        table_detector = TableDetector(flattened_result, self.doc_name, self.doc_text_lables,self.documentMasterInfo)
         image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
 
         if is_table_cord:
             table_detector.map_and_get_tableData(image_with_table)
             self.ppOCRTableData['lineData'] = table_detector.table_data
             self.ppOCRTableData['tableInfo'] = table_detector.table_header_info
+            self.ppOCRTableData['excludeLine'] = table_detector.table_noise_rows
             self.tablePosition = [[0, table_detector.table_start_y],[0, table_detector.table_end_y]]
             # table_detector.to_html()
             # table_detector.to_csv()
@@ -351,7 +352,7 @@ class KeyValueIdentifierClass:
                 for match in matches:
                     self.key_value_pairs.append({
                         "key": key_name,
-                        "value": match,
+                        "value": text if key_name == 'Amount_in_words' else match ,
                         "key_bbox": bbox,
                         "value_bbox": bbox,
                         "method": "regex_match",
@@ -360,6 +361,11 @@ class KeyValueIdentifierClass:
 
     def getkey_extractedValues(self):
         self.categorize_data()
+        # print('---------------------------------------------------------------------------')
+        # print('at getkey_extractedValues self.key_info_list------>',self.key_info_list)
+        # print('---------------------------------------------------------------------------')
+        # print('at getkey_extractedValues self.documentMasterInfo------>',self.documentMasterInfo)
+        # print('---------------------------------------------------------------------------')
         for eachKey in self.key_info_list:
             print( 'Getting Key details for these feilds ----> ', eachKey["standard_key"] )
             keybbox = json.loads(eachKey["key_bounding_box"])

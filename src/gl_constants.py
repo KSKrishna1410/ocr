@@ -22,6 +22,20 @@ regex_check = [
   {
     "key": "HSN",
     "pattern": "(?i)(?:sac|hsn)\s*code[:\-]?\s*(\d{4,8})"
+  },
+  {
+    "key": "Amount_in_words",
+    "pattern": r'(?:INR|Rupees)?\s*((?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|'
+    r'Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|'
+    r'Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|'
+    r'Hundred|Thousand|Lakh|Crore|Rupees|Paisa|And|Zero)\s+(?:(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|'
+    r'Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|'
+    r'Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|'
+    r'Hundred|Thousand|Lakh|Crore|Rupees|Paisa|And|Zero)\s+)*'
+    r'(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|'
+    r'Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|'
+    r'Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety|Rupees|Paisa|Zero))'
+    r'\s+(Only|rounding|grand|total|$)'
   }
 ]
 

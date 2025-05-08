@@ -33,22 +33,27 @@ class OCRBoxDrawer:
 
 class TableDetector:
 
-    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables):
+    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables,documentMasterInfo):
         self.ocr_data = ocr_data
+        self.documentMasterInfo = documentMasterInfo
         self.start_keywords = ['Particulars','Package','item', 'CATEGORY','(Rs.)','description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 
-                               'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess',
+                               'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess','Candidates',
                                 'sr', 'no.', 'tax', 'items', 'purchased', 'value']
         self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
                              'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total', 'Item Total']
-        self.exclude_list = ['9%', '18%', '123']
+        self.wrapKeys= ['Product Description','Item & Description','Description Of Services','Description Of Goods (Mfg Mkt)','Description of','SI Description of Goods No.',
+                        'Description/ ISN/UOM City','Description of Service','ITEM(S) PURCHASED','Desc of Goods','Item Description','Item Details','Service Description','Month',
+                        'HSN Code and Description','Name of the Product','ITEM NAME','Description','Particulars','ITEM','SI Description of Goods No','Froduct Nane','Package','Description of Goods']
+        self.exclude_list = ['9%', '18%']
+        # self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys']
+        # self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys']
+        # self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys']
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
         self.doc_text_lables = doc_text_lables
-        # self.columns = self.identify_columns()
-        # self.rows = self.identify_rows()
-
-            # Filter only elements within the table region
+        
+        # Filter only elements within the table region
         self.table_elements = [
             item for item in self.ocr_data
             if (self.table_start_y is not None and min(p[1] for p in item[0]) >= self.table_start_y-5) and
@@ -62,6 +67,7 @@ class TableDetector:
         self.table_cord = ''
         self.table_data = []
         self.table_header_info = []
+        self.table_noise_rows = []
         
     def detect_table_start(self):
         sorted_data = sorted(self.ocr_data, key=lambda item: min(p[1] for p in item[0]))
@@ -147,7 +153,8 @@ class TableDetector:
             is_table_detected = True
         return image, is_table_detected
 
-    # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical space than single-line headers, and the Y-position comparison logic assumes uniform height.
+    # common issue in OCR-based row detection: wrapped (multi-line) headers can confuse row detection logic because they span more vertical 
+    # space than single-line headers, and the Y-position comparison logic assumes uniform height.
     def identify_rows(self, table_elements, row_threshold=10):
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
         print('Inside Identify_rows ----------------> ', sorted_data)
@@ -182,6 +189,7 @@ class TableDetector:
             for row in headerRow:
                 rows.remove(row)
             rows.insert(0, merged_row)
+        print('Returned Rows ------------>' ,rows )
         return rows
     
     def identify_Merged_rows(self, ocr_data):
@@ -263,11 +271,33 @@ class TableDetector:
             return []
 
         column_positions = []
-        print(f'🏁 Identified Merged Rows ---> {len(self.mergedRows)} and the row header is {self.mergedRows}')
-        # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
+        new_column_positions = []
+        
         # Step 1: Analyze first N rows (or all rows)
+        headerRow = rows[0]
+        print('Identify the Col position for ######################' , headerRow)
+        for ridx , (polygon, (text, conf)) in enumerate(headerRow):
+            if text in self.wrapKeys:
+                print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
+                prvPoly, text = headerRow[ridx-1]
+                x_left = max([pt[0] for pt in prvPoly])
+            else:
+                x_left = min([pt[0] for pt in polygon])
+                
+            if ridx < len(headerRow)-1:
+                print(f'Identifying the Header row at position {ridx+1} and the current row value {headerRow[ridx+1]}')
+                nextPolyon, text = headerRow[ridx+1]    
+                x_right = min([pt[0] for pt in nextPolyon])              
+            else:
+                x_right = max([pt[0] for pt in polygon])
+            new_column_positions.append((x_left, x_right))
+        print('🏁 Identified Columns positions ------> ', new_column_positions)
+        
+        
+        
+        # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
         for row in rows[:row_limit]:
-            print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
+            # print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
             for polygon, text in row:
                 x_left = min([pt[0] for pt in polygon])
                 x_right = max([pt[0] for pt in polygon])
@@ -275,7 +305,6 @@ class TableDetector:
 
         # Step 2: Sort left positions
         column_positions.sort(key=lambda x: x[0])
-        print('🏁 Identified Columns positions ------> ', column_positions)
         # Step 3: Merge overlapping/close columns
         merged_columns = []
         for col in column_positions:
@@ -288,9 +317,38 @@ class TableDetector:
                     merged_columns[-1] = (min(last[0], col[0]), max(last[1], col[1]))
                 else:
                     merged_columns.append(col)
-        print('Final merged columns after detection -----------> ', merged_columns)
-        return merged_columns
+        # return merged_columns
+        print('🏁 Identified Merged Columns positions ------> ', merged_columns)
+        new_column_positions[len(new_column_positions)-1] = merged_columns[len(merged_columns)-1]
+        return new_column_positions
 
+    def find_wrap_keys_in_headers(self,header_rows):
+        """
+        Check if any wrap_keys are present in header_rows and return their positions.
+        
+        Args:
+            header_rows (list): List of header names.
+            wrap_keys (list): List of keys to search for in header_rows.
+        
+        Returns:
+            list: List of tuples (key, index, header) for matching keys and their positions.
+        """
+        matches = []
+        print('Header Row ---------------> ', header_rows)
+        # Convert header_rows to lowercase for case-insensitive comparison
+        header_rows_lower = [header.lower().strip() for header in header_rows]
+        
+        # Check each wrap key
+        for key in self.wrapKeys:
+            # Convert key to lowercase for comparison
+            key_lower = key.lower().strip()
+            
+            # Check if the key is in any header (partial or full match)
+            for idx, header in enumerate(header_rows_lower):
+                if key_lower in header:
+                    matches.append((key, idx, header_rows[idx]))  # Store original key, index, and original header
+        return matches
+    
     def is_headertext(self, rowItem):
         start_keywords_set = set(kw.strip().lower() for kw in self.start_keywords)
         matched_count = 0
@@ -342,11 +400,16 @@ class TableDetector:
             for kw in self.doc_text_lables
             if kw.strip() not in self.exclude_list
         ]
-        print("---------------------")
+        # print('Inside get_table_info Rows ------------>' ,self.rows )
+        # print('Inside get table Columns---------->', self.columns)
+        # Find matches
+        matchedIndex = []
+        
         for ridx, eachRow in enumerate(self.rows):
             if len(self.rows)-1 == ridx:
                 continue # To Skip the last row item from the Detected Table element
             rowItem = True
+            isLinexclude = False
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
             sortedRows.append(eachRow)
             row_data = ['null'] * len(sortedCol)
@@ -355,6 +418,7 @@ class TableDetector:
                 x_max = max([pt[0] for pt in box])
                 x_center = (x_min + x_max) / 2
                 # if text.lower() in [kw.lower().strip() for kw in ['CGST @ 9%','SGST @ 9%','Total']]:
+                # Filter or Clean Extract rows 
                 if text.lower().strip() in filtered_labels:
                     rowItem = False
                 for idx, (col_start, col_end) in enumerate(sortedCol):
@@ -362,35 +426,46 @@ class TableDetector:
                         row_data[idx] = text
                         break
                 non_null_count = sum(1 for item in row_data if item != 'null')
+            print(row_data)
+            if ridx == 0:
+                matches = self.find_wrap_keys_in_headers(row_data)
+                # Print results
+                if matches:
+                    print("Matches found:")
+                    for key, idx, header in matches:
+                        print(f"Key: '{key}' found in header: '{header}' at index: {idx}")
+                        matchedIndex.append(idx)
+                else:
+                    print("No wrap_keys found in header_rows.")
+                           
+                                       
             is_Header_row = self.identify_as_headerRow(row_data)
             print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem}  and Header Identifiction as {is_Header_row} for Index row {ridx} and non_null_count is {non_null_count}' )
-            # if ridx < 2 and len(self.table_data) > 0 and rowItem == False :
-            if is_Header_row and len(self.table_data) > 0 and rowItem == False :
-                for eidx, eachCell in enumerate(row_data):
-                    if self.table_data[0][eidx] == 'null' and eachCell != 'null':
-                        self.table_data[0][eidx] = eachCell
-                    elif eachCell != 'null':
-                        self.table_data[0][eidx] = self.table_data[0][eidx] + ' ' + eachCell
-                continue
-            elif non_null_count <= 2 and len(self.table_data) > 0 and rowItem:
+            if non_null_count <= 2 and len(self.table_data) > 0 and rowItem:
                 lastRowItemIdx = len(self.table_data)-1
                 is_LastItem_Header_row = self.identify_as_headerRow(self.table_data[lastRowItemIdx])
                 # print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
                 if is_LastItem_Header_row == False:
                     for eidx, eachCell in enumerate(row_data):
-                        if eachCell != 'null' and eidx <= len(row_data)/2:
+                        # if eachCell != 'null' and eidx <= len(row_data)/2:
+                        #     self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+                        if eachCell != 'null' and eidx <= len(row_data)/2 and eidx in matchedIndex:
                             self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+                            isLinexclude = False
+                        else: isLinexclude = True
+                        
+                    # if isLinexclude:  self.table_noise_rows.append(row_data)
                     continue
                 # else:
                 #     self.table_data.append(row_data)
-            if ridx > 2:
-                if rowItem :
-                    self.table_data.append(row_data)
-            else: self.table_data.append(row_data)
+            elif rowItem or ridx == 0:
+                self.table_data.append(row_data)
+            else: 
+                self.table_noise_rows.append(row_data)
         print("---------------------")
         print('Sorted Rows Table Header Info ---------> ', self.table_data )
         
-        print('Sorted Col Table Header Info ---------> ', sortedCol )
+        print('Noise Information ---------> ', self.table_noise_rows )
         for i, (cell, (key, confidence)) in enumerate(sortedRows[0]):
             if i < len(sortedCol):
                 col_start, col_end = sortedCol[i]

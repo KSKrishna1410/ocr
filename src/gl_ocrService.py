@@ -19,12 +19,21 @@ def processOcr(folder_path, docType, file, uniqueId):
         return
 
     print(f"✅ Found {len(image_paths)} images. Processing...")
-    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType)
+    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, len(image_paths))
 
     if docType:
         keyMappingData = generate_key_mapping_remote(docType)
     extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
 
+    if len(image_paths) >1:
+        docCt_Type, isSingle = compare_array_keys_and_values(finalOutput["pageWiseData"][0]["headerInfo"], finalOutput["pageWiseData"][1]["headerInfo"])
+        print('I got the Doc count as ', docCt_Type)
+        finalOutput["isSingleDoc"] = isSingle
+        finalOutput["obj_Type"] = docCt_Type
+    else: 
+        finalOutput["isSingleDoc"] = True
+        finalOutput["obj_Type"] = 'SINGLE_DOC_OBJ'
+    
     if docType == 'BANKSTMT' and ifsc_code:
         bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
     else:
@@ -53,13 +62,15 @@ def handle_image_conversion(folder_path, file, remote_dir):
     print("❌ Unsupported file format.")
     return [], None
 
-def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType):
+def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, ct):
     return {
         "processId": uniqueId,
         "filePath": remote_path,
         "fileDir": remote_dir,
         "document_type": docType.upper() if docType else None,
-        "rawtext": '',
+        "page_cnt": ct,
+        "isSingleDoc": '',
+        "obj_Type": '',
         "fileType": fileType,
         "pageWiseData": [],
         "lineTabulaData": []
@@ -124,3 +135,68 @@ def finalize_output(finalOutput):
     if not finalOutput.get("lineTabulaData") and finalOutput.get("fileType") != 'Image':
         finalOutput["fileType"] = 'Scanned Document'
     return convert_ndarray(finalOutput)
+
+def normalize_date(date_str):
+    """Normalize date strings to YYYY-MM-DD format."""
+    try:
+        for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]:
+            try:
+                return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return date_str
+    except Exception:
+        return date_str
+
+def compare_array_keys_and_values(array1, array2):
+    # Extract unique keys from each array
+    keys1 = set(item["key"] for item in array1)
+    keys2 = set(item["key"] for item in array2)
+    
+    # Find keys unique to each array and common keys
+    unique_to_array1 = list(keys1 - keys2)
+    unique_to_array2 = list(keys2 - keys1)
+    common_keys = list(keys1 & keys2)
+    
+    # Compare values for common keys
+    sameValuearray = []
+    diffValuearray = []
+    
+    for key in common_keys:
+        # Get all values for the key from both arrays
+        values1 = [item["value"] for item in array1 if item["key"] == key]
+        values2 = [item["value"] for item in array2 if item["key"] == key]
+        
+        # Normalize dates if key is likely a date
+        if key.lower().find("date") != -1:
+            values1 = [normalize_date(v) for v in values1]
+            values2 = [normalize_date(v) for v in values2]
+        
+        # Check if any value matches
+        has_match = False
+        for v1 in values1:
+            for v2 in values2:
+                if v1 == v2:
+                    has_match = True
+                    break
+            if has_match:
+                break
+        
+        # Assign key to appropriate array
+        if has_match:
+            sameValuearray.append(key)
+        else:
+            diffValuearray.append(key)
+    
+    # Return result as a dictionary
+    comparisionRepo = {
+        "unique_to_array1": sorted(unique_to_array1),
+        "unique_to_array2": sorted(unique_to_array2),
+        "sameValuearray": sorted(sameValuearray),
+        "diffValuearray": sorted(diffValuearray)
+    }
+    print("Object Comparision report -------------> ", comparisionRepo)
+    if len(sorted(diffValuearray)) <= 0 :
+        return 'SINGLE_DOC_OBJ', True
+    else:
+        return 'MULTI_DOC_OBJ' ,False

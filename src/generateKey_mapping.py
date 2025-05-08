@@ -76,6 +76,7 @@ class documentClassifier:
         
         
     def _load_csv(self, remote_csv_path, key_mapping, all_keys, masterInfo):
+        all_key_mapping= {}
         csv_bytes = read_file_from_sftp(remote_csv_path)
         csv_string = csv_bytes.decode("utf-8")
 
@@ -90,6 +91,11 @@ class documentClassifier:
                 else:
                     key_mapping[key].append(doc_text)
             
+            if key not in all_key_mapping:
+                all_key_mapping[key] = [doc_text]
+            else:
+                all_key_mapping[key].append(doc_text)
+            
             if doc_text not in all_keys:
                 all_keys.append(doc_text)
             if  key not in masterInfo:
@@ -99,7 +105,7 @@ class documentClassifier:
                         "fieldType": fieldType,
                         "fieldKeys": ''
                 }
-        for key, field_keys_list in key_mapping.items():
+        for key, field_keys_list in all_key_mapping.items():
             masterInfo[key]['fieldKeys'] = field_keys_list
         # print(f'Inside KeyValueIdentifierClass {masterInfo}')
                 

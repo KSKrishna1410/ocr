@@ -81,15 +81,6 @@ class TableDetector:
                 return y_start
         return None
 
-    def detect_table_end_old(self):
-        sorted_data = sorted(self.ocr_data, key=lambda item: min(p[1] for p in item[0]))
-        for polygon, (text, conf) in reversed(sorted_data):  # Start from bottom
-            lower_text = text.lower().strip()
-            if lower_text in [kw.lower() for kw in self.end_keywords]:
-                y_end = max(p[1] for p in polygon)
-                return y_end
-        return None
-    
     def detect_table_end(self):
         if self.table_start_y is None:
             return None
@@ -158,7 +149,7 @@ class TableDetector:
     # space than single-line headers, and the Y-position comparison logic assumes uniform height.
     def identify_rows(self, table_elements, row_threshold=10):
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
-        print('Inside Identify_rows ----------------> ', sorted_data)
+        # print('Inside Identify_rows ----------------> ', sorted_data)
         rows = []
         current_row = []
         last_y = None
@@ -190,7 +181,7 @@ class TableDetector:
             for row in headerRow:
                 rows.remove(row)
             rows.insert(0, merged_row)
-        print('Returned Rows ------------>' ,rows )
+        # print('Returned Rows ------------>' ,rows )
         return rows
     
     def identify_Merged_rows(self, ocr_data):
@@ -328,7 +319,6 @@ class TableDetector:
                     merged_columns.append(col)
         print('🏁 Modified Columns positions ------> ', merged_columns)
         return merged_columns
-
 
     def find_wrap_keys_in_headers(self,header_rows):
         """

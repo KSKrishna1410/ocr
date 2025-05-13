@@ -143,6 +143,7 @@ class DocumentAnalyzer:
             self.ppOCRTableData['tableInfo'] = table_detector.table_header_info
             self.ppOCRTableData['excludeLine'] = table_detector.table_noise_rows
             self.tablePosition = [[0, table_detector.table_start_y],[0, table_detector.table_end_y]]
+            self.ppOCRTableData['tablePosition'] = self.tablePosition
             # table_detector.to_html()
             # table_detector.to_csv()
 
@@ -202,6 +203,7 @@ class KeyValueIdentifierClass:
         match_candidates = []
         dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 500
         closest_bbox = None
+        print(f'Inside Right aligned = {key_text} and dynamicThreshold = {dynamicThreshold}')
         for val_text, val_bbox in self.values:
             normalized_text = cleanedText(val_text)
             if normalized_text in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in self.doc_text_lables]:
@@ -222,12 +224,13 @@ class KeyValueIdentifierClass:
                     closest_bbox = val_bbox
                     capturedMethod = 'right_aligned_pair'
                     closest_distance = calculate_distance(key_bbox, closest_bbox)
-                    print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance)
+                    print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance, ' -- Dynamic threshold -->', dynamicThreshold)
                     existing_index = next((i for i, kv in enumerate(self.key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
                     for threshold in range(100, dynamicThreshold, 100):
                         if closest_value and closest_distance < threshold:
+                            print(f'Identified value with in Threshol for { key_text} and the value is {closest_value}')
                             if existing_index is None:
                                 self.key_value_pairs.append({
                                     "key": key_text,
@@ -268,7 +271,7 @@ class KeyValueIdentifierClass:
         bottom_closest_value = None
         min_y_distance = float('inf')
         key_text = currentKey['standard_key']
-        print('Identify the value for ', key_text)
+        print('Identifying the value for ', key_text)
         for val_text, val_bbox in self.values:
             normalized_text = cleanedText(val_text)
             if normalized_text in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in self.doc_text_lables]:

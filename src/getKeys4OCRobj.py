@@ -3,7 +3,7 @@ import re
 
 def normalize(text):
     # return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
-    return re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
+    # return re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
     return text
 
 def get_best_match(text, key_mapping, threshold=0.85):

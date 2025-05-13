@@ -25,7 +25,7 @@ def processOcr(folder_path, docType, file, uniqueId):
         keyMappingData = generate_key_mapping_remote(docType)
     extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
 
-    if len(image_paths) >1:
+    if len(image_paths) >1 and fileType != 'INVOICE':
         docCt_Type, isSingle = compare_array_keys_and_values(finalOutput["pageWiseData"][0]["headerInfo"], finalOutput["pageWiseData"][1]["headerInfo"])
         print('I got the Doc count as ', docCt_Type)
         finalOutput["isSingleDoc"] = isSingle
@@ -34,14 +34,23 @@ def processOcr(folder_path, docType, file, uniqueId):
         finalOutput["isSingleDoc"] = True
         finalOutput["obj_Type"] = 'SINGLE_DOC_OBJ'
     
-    if docType == 'BANKSTMT' and ifsc_code:
+    if ((docType == 'BANKSTMT' or fileType== 'BANKSTMT') and ifsc_code):
         bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
     else:
         bank_name = None
-    
-    if file.lower().endswith(".pdf"):
+    newTabArray= []
+    if file.lower().endswith(".pdf") and fileType != 'INVOICE':
         tableInfo = handle_tabular_data(folder_path, file, remote_dir, docType, bank_name)
-        finalOutput["lineTabulaData"] = tableInfo
+        if len(tableInfo) < 1:
+            for eachpage in finalOutput["pageWiseData"]:
+                if eachpage['lineInfo'] and eachpage['lineInfo']['lineData']:
+                    newTabArray = newTabArray + eachpage['lineInfo']['lineData']
+                else:
+                    newTabArray = newTabArray + []
+            finalOutput["lineTabulaData"] = newTabArray
+            print(' new modified Table array',newTabArray )
+        else :
+            finalOutput["lineTabulaData"] = tableInfo
         # if len(tableInfo) > 2:
         #     finalOutput["pageWiseData"][0]['lineInfo']['lineData'] = tableInfo
 

@@ -33,26 +33,27 @@ class OCRBoxDrawer:
 
 class TableDetector:
 
-    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables,documentMasterInfo):
+    def __init__(self, ocr_data: List[Tuple[List[List[int]], Tuple[str, float]]], doc_name, doc_text_lables,documentMasterInfo,actual_doc_type):
         self.ocr_data = ocr_data
+        self.actual_doc_type = actual_doc_type
         self.documentMasterInfo = documentMasterInfo
-        self.start_keywords = ['Particulars','Package','item', 'CATEGORY','(Rs.)','description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 
-                               'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess','Candidates',
-                                'sr', 'no.', 'tax', 'items', 'purchased', 'value']
-        self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
-                             'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total', 'Item Total']
-        self.wrapKeys= ['Product Description','Item & Description','Description Of Services','Description Of Goods (Mfg Mkt)','Description of','SI Description of Goods No.',
-                        'Description/ ISN/UOM City','Description of Service','ITEM(S) PURCHASED','Desc of Goods','Item Description','Item Details','Service Description','Month',
-                        'HSN Code and Description','Name of the Product','ITEM NAME','Description','Particulars','ITEM','SI Description of Goods No','Froduct Nane','Package','Description of Goods']
+        # self.start_keywords = ['Particulars','Package','item', 'CATEGORY','(Rs.)','description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 
+        #                        'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess','Candidates',
+        #                         'sr', 'no.', 'tax', 'items', 'purchased', 'value']
+        # self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
+        #                      'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total', 'Item Total']
+        # self.wrapKeys= ['Product Description','Item & Description','Description Of Services','Description Of Goods (Mfg Mkt)','Description of','SI Description of Goods No.',
+        #                 'Description/ ISN/UOM City','Description of Service','ITEM(S) PURCHASED','Desc of Goods','Item Description','Item Details','Service Description','Month',
+        #                 'HSN Code and Description','Name of the Product','ITEM NAME','Description','Particulars','ITEM','SI Description of Goods No','Froduct Nane','Package','Description of Goods']
         self.exclude_list = ['9%', '18%']
-        # self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys']
-        # self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys']
-        # self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys']
+        self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys'] if self.documentMasterInfo else []
+        self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys'] if self.documentMasterInfo else []
+        self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys'] if self.documentMasterInfo else []
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
         self.doc_text_lables = doc_text_lables
-        
+        self.table_region = self.get_table_region()
         # Filter only elements within the table region
         self.table_elements = [
             item for item in self.ocr_data
@@ -63,7 +64,7 @@ class TableDetector:
         self.rows = self.identify_rows(self.table_elements)
         self.mergedRows = []
         # self.mergedRows = self.merge_wrapped_text_rows(self.table_elements)
-        self.columns = self.identify_columns(self.rows)
+        self.columns = self.identify_merged_columns(self.rows) if self.actual_doc_type=='INVOICE' else self.identify_columns(self.rows)
         self.table_cord = ''
         self.table_data = []
         self.table_header_info = []
@@ -144,7 +145,7 @@ class TableDetector:
     def draw_table_box(self, image):
         is_table_detected=''
         x1, y1, x2, y2 = self.get_table_region()
-        print('Table region detected from the method ->', x1, y1, x2, y2 )
+        print('Table region detected from the method ->', self.get_table_region() )
         if x1 == x2 and y1 == y2:
             print("[INFO] Table region not detected.")
             is_table_detected = False
@@ -266,21 +267,19 @@ class TableDetector:
         
         return merged_row
     
-    def identify_columns(self, rows, col_threshold=10, row_limit=3):
+    def identify_columns(self, rows, col_threshold=3, row_limit=3):
         if not rows:
             return []
-
-        column_positions = []
-        new_column_positions = []
-        
+        new_column_positions = []      
         # Step 1: Analyze first N rows (or all rows)
         headerRow = rows[0]
-        print('Identify the Col position for ######################' , headerRow)
+        print('Identify the Header rows as ######################' , headerRow)
         for ridx , (polygon, (text, conf)) in enumerate(headerRow):
             if text in self.wrapKeys and ridx >0:
                 print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
                 prvPoly, text = headerRow[ridx-1]
                 x_left = max([pt[0] for pt in prvPoly])
+                new_column_positions[-1] = (new_column_positions[-1][0], x_left)
             else:
                 x_left = min([pt[0] for pt in polygon])
                 
@@ -291,22 +290,32 @@ class TableDetector:
             else:
                 x_right = max([pt[0] for pt in polygon])
             new_column_positions.append((x_left, x_right))
-        print('🏁 Identified Columns positions ------> ', new_column_positions)
+        new_column_positions[-1] = (new_column_positions[-1][0], self.get_table_region()[2])
         
-        
-        
+        print('🏁 Modified Columns positions ------> ', new_column_positions)
+        return new_column_positions
+
+    def identify_merged_columns(self, rows, col_threshold=3, row_limit=3):
+        if not rows:
+            return []
+        column_positions = []
+        # Step 1: Analyze first N rows (or all rows)
+        headerRow = rows[0]
+        print('Identify the Header rows as ######################' , headerRow)      
         # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
         for row in rows[:row_limit]:
-            # print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
-            for polygon, text in row:
-                x_left = min([pt[0] for pt in polygon])
-                x_right = max([pt[0] for pt in polygon])
-                column_positions.append((x_left, x_right))
+            print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
+            if len(row) >= len(headerRow)/2 :
+                for polygon, text in row:
+                    x_left = min([pt[0] for pt in polygon])
+                    x_right = max([pt[0] for pt in polygon])
+                    column_positions.append((x_left, x_right))
 
         # Step 2: Sort left positions
         column_positions.sort(key=lambda x: x[0])
         # Step 3: Merge overlapping/close columns
         merged_columns = []
+
         for col in column_positions:
             if not merged_columns:
                 merged_columns.append(col)
@@ -317,11 +326,9 @@ class TableDetector:
                     merged_columns[-1] = (min(last[0], col[0]), max(last[1], col[1]))
                 else:
                     merged_columns.append(col)
-        # return merged_columns
-        print('🏁 Identified Merged Columns positions ------> ', merged_columns)
-        new_column_positions[len(new_column_positions)-1] = merged_columns[len(merged_columns)-1]
-        return new_column_positions
-        # return merged_columns
+        print('🏁 Modified Columns positions ------> ', merged_columns)
+        return merged_columns
+
 
     def find_wrap_keys_in_headers(self,header_rows):
         """
@@ -438,7 +445,6 @@ class TableDetector:
                         matchedIndex.append(idx)
                 else:
                     print("No wrap_keys found in header_rows.")
-                           
                                        
             is_Header_row = self.identify_as_headerRow(row_data)
             print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem}  and Header Identifiction as {is_Header_row} for Index row {ridx} and non_null_count is {non_null_count}' )

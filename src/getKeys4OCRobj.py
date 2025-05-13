@@ -45,12 +45,13 @@ def getKeylist(actual_ocr_output, key_mapping, doc_text_lables):
         normalized_text = normalize(text)
         is_colon_detect = False
         # Handle colon-based key-value detection: key: value
-        colon_match = re.match(r"^\s*(.+?)\s*[:|#]\s*(.+?)\s*$", text)
-        colon_match = re.match(r"^\s*(.+?)\s*:\s*(.+?)\s*$", text)
+        colon_match = re.match(r"^\s*(.+?)\s*[:#]\s*(.+?)\s*$", text)
+        # colon_match = re.match(r"^\s*(.+?)\s*:\s*(.+?)\s*$", text)
         if colon_match:
             parts = re.split(r'[:#]', text, maxsplit=1)
+            print(f' Key is identifued as parts {parts} for the text {text}')
             key_part = parts[0].strip()
-            value_part = parts[1].strip()
+            value_part = parts[1].strip() if parts[1] else ''
             is_colon_detect = True
             if normalize(value_part) in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in doc_text_lables]:
                 is_colon_detect = False

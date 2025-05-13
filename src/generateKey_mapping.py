@@ -68,7 +68,7 @@ class documentClassifier:
         self.invoiceMasterInfo = {}
         self.bankMasterInfo = {}
         self._load_csv("/files/ocr_files/Invoice_allkeys.csv", self.invoice_key_mapping, self.invoice_keywords, self.invoiceMasterInfo)
-        self._load_csv("/files/ocr_files/bankstmt_allkeys.csv", self.bank_key_mapping, self.bank_keywords, self.bankMasterInfo)
+        self._load_csv("/files/ocr_files/Bankstmt_allkeys.csv", self.bank_key_mapping, self.bank_keywords, self.bankMasterInfo)
         self.doc_type_mapping = {
             'INVOICE': self.invoice_key_mapping,
             'BANKSTMT': self.bank_key_mapping

@@ -101,8 +101,8 @@ class DocumentAnalyzer:
 
     def analyze_and_extract(self):
         self._classify_document()
-        if self.actual_doc_type == "INVOICE":
-            self._identify_and_extract_table()
+        # if self.actual_doc_type == "INVOICE":
+        self._identify_and_extract_table()
         self._prepare_document_key_value_pairs()
         keyValueIdentifier = KeyValueIdentifierClass(self.sortedOCRresult,self.doc_key_list_array, self.doc_text_lables, self.tablePosition,self.documentMasterInfo, self.actual_doc_type )
         # extracted_data = find_aligned_value(self.extracted_data, self.doc_key_list_array)
@@ -134,7 +134,7 @@ class DocumentAnalyzer:
         drawer = OCRBoxDrawer(self.image_path, flattened_result)
         image_with_boxes = drawer.draw_boxes()
 
-        table_detector = TableDetector(flattened_result, self.doc_name, self.doc_text_lables,self.documentMasterInfo)
+        table_detector = TableDetector(flattened_result, self.doc_name, self.doc_text_lables,self.documentMasterInfo, self.actual_doc_type)
         image_with_table, is_table_cord = table_detector.draw_table_box(image_with_boxes)
 
         if is_table_cord:
@@ -372,15 +372,17 @@ class KeyValueIdentifierClass:
             if keybbox is not None and eachKey["value"] is None :
                 if self.docType == 'INVOICE':
                     if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double": # Non decimal
-                        if self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]: # above table position item
+                        if self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]: # Search invoice elements above Invoice Line table position item
                             self.right_aligned(eachKey)
                             self.bottom_aligned(eachKey)
                     else :
-                        if self.tablePosition and keybbox[0][1]-40 > self.tablePosition[0][1]: # For Decimals Below table position item
+                        if self.tablePosition and keybbox[0][1]-40 > self.tablePosition[0][1]: # Search Invoice Decimals elements Below table position item
                             self.right_aligned(eachKey)
                             self.bottom_aligned(eachKey)
                 else :
                     self.right_aligned(eachKey)
+                    if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
+                        self.bottom_aligned(eachKey)
                 
                 
                 

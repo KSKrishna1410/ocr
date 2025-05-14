@@ -201,7 +201,7 @@ class KeyValueIdentifierClass:
         min_x_distance = float('inf')
         key_text = currentKey['standard_key']
         match_candidates = []
-        dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 500
+        dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 600
         closest_bbox = None
         print(f'Inside Right aligned = {key_text} and dynamicThreshold = {dynamicThreshold}')
         for val_text, val_bbox in self.values:
@@ -214,7 +214,8 @@ class KeyValueIdentifierClass:
             val_x2, val_y2 = val_bbox[1]
 
             average = statistics.mean([key_x1, key_x2])
-            if key_x2-10 <= val_x1  and key_y2 -5 <= val_y1 < key_y3 :
+            # for y_position_threshold in range(5, 5, 15):
+            if key_x2-10 <= val_x1  and key_y2 - 15 <= val_y1 < key_y3 :
             # if key_x1 <= val_x1 <= key_x2 and abs(val_y1 - key_y1) <= self.x_align4_bottom:
             # if val_x1 > average and abs(val_y1 - key_y1) <= self.x_align4_bottom:
                 x_distance = val_x1 - key_x2
@@ -229,6 +230,7 @@ class KeyValueIdentifierClass:
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
                     for threshold in range(100, dynamicThreshold, 100):
+                        # print(f'Identified value with in Threshol for { key_text} --> {val_text} and the value is {closest_value} at threshol {threshold} and col_dist {closest_distance}')
                         if closest_value and closest_distance < threshold:
                             print(f'Identified value with in Threshol for { key_text} and the value is {closest_value}')
                             if existing_index is None:

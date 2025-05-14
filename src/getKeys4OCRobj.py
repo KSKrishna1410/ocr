@@ -4,7 +4,7 @@ import re
 def normalize(text):
     # return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
     # return re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
-    return text
+    return text.lower().strip()
 
 def get_best_match(text, key_mapping, threshold=0.85):
     normalized_text = normalize(text)
@@ -54,6 +54,7 @@ def getKeylist(actual_ocr_output, key_mapping, doc_text_lables):
             value_part = parts[1].strip() if parts[1] else ''
             is_colon_detect = True
             if normalize(value_part) in [re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', kw.lower().strip()) for kw in doc_text_lables]:
+                print(f' Skipping Colon detection an value matched with Key lables')
                 is_colon_detect = False
         
         if is_colon_detect: 

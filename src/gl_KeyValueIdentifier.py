@@ -227,11 +227,12 @@ class KeyValueIdentifierClass:
                     closest_distance = calculate_distance(key_bbox, closest_bbox)
                     print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance, ' -- Dynamic threshold -->', dynamicThreshold)
                     existing_index = next((i for i, kv in enumerate(self.key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
-                    matches = re.findall(feilds_pattern[key_text], closest_value)
-                    print(f'Regex match with {closest_value} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
-                    if len(matches) == 0:
-                        print(f'Skipping this value {closest_value} as Regex pattern Didnt matched')
-                        continue
+                    if feilds_pattern.get(key_text):
+                        matches = re.findall(feilds_pattern[key_text], closest_value)
+                        print(f'Regex match with {closest_value} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
+                        if len(matches) == 0:
+                            print(f'Skipping this value {closest_value} as Regex pattern Didnt matched')
+                            continue
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
                     for threshold in range(100, dynamicThreshold, 100):
@@ -297,11 +298,12 @@ class KeyValueIdentifierClass:
             if not (key_x1 - self.x_align4_bottom <= val_x1 <= key_x2 + self.x_align4_bottom):  # give a little buffer
                 continue
             
-            # ✅ Check if it's horizontally aligned with the key
-            matches = re.findall(feilds_pattern[key_text], val_text)
-            print(f'Regex match with {val_text} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
-            if len(matches) == 0:
-                continue
+            # ✅ Check the Value with Regex and pass
+            if feilds_pattern.get(key_text):
+                matches = re.findall(feilds_pattern[key_text], val_text)
+                print(f'Regex match with {val_text} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
+                if len(matches) == 0:
+                    continue
             # ✅ Pick the closest y-distance only (avoid full Euclidean overshoot)
             if y_distance < min_y_distance:
                 min_y_distance = y_distance

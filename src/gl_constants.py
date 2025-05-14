@@ -59,7 +59,7 @@ feilds_pattern = {
   "HSN": "^\\d{4}(\\d{2}){0,1}(\\d{2}){0,1}$",
   "IGST Tax Amount": "^(?:₹\\s?)?(\\d{1,3}(?:,\\d{3})*|\\d+)(\\.\\d{1,2})?(?:\\s?INR)?$",
   "IGST Tax Rate": "^(0\\.25|0\\.5|1|1\\.5|2\\.5|3|5|6|7\\.5|8|9|10|12|14|18|24|28)%$",
-  "Invoice Date": "\b(?:(?:\d{1,2}[-\/.\s])?(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[-\/.\s]?\d{2,4}|\d{1,2}[-\/.\s]\d{1,2}[-\/.\s]\d{2,4}|\d{4}[-\/.\s]\d{1,2}[-\/.\s]\d{1,2}|\d{8})(?:[\sT]\d{2}:\d{2}(?::\d{2})?)?\b",
+  "Invoice Date New": "\b(?:(?:\d{1,2}[-\/.\s])?(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[-\/.\s]?\d{2,4}|\d{1,2}[-\/.\s]\d{1,2}[-\/.\s]\d{2,4}|\d{4}[-\/.\s]\d{1,2}[-\/.\s]\d{1,2}|\d{8})(?:[\sT]\d{2}:\d{2}(?::\d{2})?)?\b",
   "Invoice Number": "^.*$",
   "Invoice Total Amount": "^(?:₹\\s?)?(\\d{1,3}(?:,\\d{3})*|\\d+)(\\.\\d{1,2})?(?:\\s?INR)?$",
   "IRN No": "^.*$",

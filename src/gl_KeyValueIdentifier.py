@@ -18,7 +18,7 @@ from src.generateKey_mapping import documentClassifier, generate_key_mapping_rem
 
 
 
-from src.gl_constants import regex_check
+from src.gl_constants import regex_check, feilds_pattern
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)
 
@@ -227,6 +227,11 @@ class KeyValueIdentifierClass:
                     closest_distance = calculate_distance(key_bbox, closest_bbox)
                     print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance, ' -- Dynamic threshold -->', dynamicThreshold)
                     existing_index = next((i for i, kv in enumerate(self.key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
+                    matches = re.findall(feilds_pattern[key_text], closest_value)
+                    print(f'Regex match with {closest_value} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
+                    if len(matches) == 0:
+                        print(f'Skipping this value {closest_value} as Regex pattern Didnt matched')
+                        continue
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
                     for threshold in range(100, dynamicThreshold, 100):
@@ -280,7 +285,6 @@ class KeyValueIdentifierClass:
                 continue
             if val_bbox in self.used_value_bboxes:
                 continue  # Skip reused values
-
             val_x1, val_y1 = val_bbox[0]
             val_y3 = val_bbox[2][1]
             
@@ -292,7 +296,12 @@ class KeyValueIdentifierClass:
             # ✅ Check if it's horizontally aligned with the key
             if not (key_x1 - self.x_align4_bottom <= val_x1 <= key_x2 + self.x_align4_bottom):  # give a little buffer
                 continue
-
+            
+            # ✅ Check if it's horizontally aligned with the key
+            matches = re.findall(feilds_pattern[key_text], val_text)
+            print(f'Regex match with {val_text} against pattern {feilds_pattern[key_text]} and matched res is {matches}')
+            if len(matches) == 0:
+                continue
             # ✅ Pick the closest y-distance only (avoid full Euclidean overshoot)
             if y_distance < min_y_distance:
                 min_y_distance = y_distance
@@ -388,9 +397,6 @@ class KeyValueIdentifierClass:
                     self.right_aligned(eachKey)
                     if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
                         self.bottom_aligned(eachKey)
-                
-                
-                
                 # if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double":
                 #     if self.docType == 'INVOICE' and self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]:
                 #         match_found = False

@@ -2,9 +2,9 @@ from difflib import SequenceMatcher
 import re
 
 def normalize(text):
-    # return re.sub(r"[^a-z0-9 ]+", "", text.lower().strip())
+    return re.sub(r"^[^a-zA-Z0-9(#:)]+|[^a-zA-Z0-9(#:)]+", "", text.lower().strip())
     # return re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', text.lower().strip())
-    return text.lower().strip()
+    # return text.lower().strip()
 
 def get_best_match(text, key_mapping, threshold=0.85):
     normalized_text = normalize(text)
@@ -45,7 +45,7 @@ def getKeylist(actual_ocr_output, key_mapping, doc_text_lables):
         normalized_text = normalize(text)
         is_colon_detect = False
         # Handle colon-based key-value detection: key: value
-        colon_match = re.match(r"^\s*(.+?)\s*[:#]\s*(.+?)\s*$", text)
+        colon_match = re.match(r"^\s*(.+?)\s*[:#]\s*(.+\S)\s*$", text)
         # colon_match = re.match(r"^\s*(.+?)\s*:\s*(.+?)\s*$", text)
         if colon_match:
             parts = re.split(r'[:#]', text, maxsplit=1)

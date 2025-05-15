@@ -23,6 +23,10 @@ regex_check = [
     "key": "HSN",
     "pattern": "(?i)(?:sac|hsn)\s*code[:\-]?\s*(\d{4,8})"
   },
+    {
+    "key": "Invoice Number",
+    "pattern": "Invoice Number\s*([\w\/-]+)"
+  },
   {
     "key": "Amount_in_words",
     "pattern": r'(?:INR|Rupees)?\s*((?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|'

@@ -64,7 +64,7 @@ class TableDetector:
         self.rows = self.identify_rows(self.table_elements)
         self.mergedRows = []
         # self.mergedRows = self.merge_wrapped_text_rows(self.table_elements)
-        self.columns = self.identify_merged_columns(self.rows) if self.actual_doc_type=='INVOICE' else self.identify_columns(self.rows)
+        self.columns = self.identify_merged_columns(self.rows) if self.actual_doc_type =='INVOICE' else self.identify_columns(self.rows)
         self.table_cord = ''
         self.table_data = []
         self.table_header_info = []
@@ -264,7 +264,7 @@ class TableDetector:
         new_column_positions = []      
         # Step 1: Analyze first N rows (or all rows)
         headerRow = rows[0]
-        print('Identify the Header rows as ######################' , headerRow)
+        print('Identify the Header rows as in identify_columns ######################' , headerRow)
         for ridx , (polygon, (text, conf)) in enumerate(headerRow):
             if text in self.wrapKeys and ridx >0:
                 print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
@@ -283,7 +283,7 @@ class TableDetector:
             new_column_positions.append((x_left, x_right))
         new_column_positions[-1] = (new_column_positions[-1][0], self.get_table_region()[2])
         
-        print('🏁 Modified Columns positions ------> ', new_column_positions)
+        print('🏁 Modified new_column_positions  ------> ', new_column_positions)
         return new_column_positions
 
     def identify_merged_columns(self, rows, col_threshold=3, row_limit=3):
@@ -292,7 +292,7 @@ class TableDetector:
         column_positions = []
         # Step 1: Analyze first N rows (or all rows)
         headerRow = rows[0]
-        print('Identify the Header rows as ######################' , headerRow)      
+        print('Identify the Header rows as in identify_merged_columns ######################' , headerRow)      
         # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
         for row in rows[:row_limit]:
             print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
@@ -317,7 +317,10 @@ class TableDetector:
                     merged_columns[-1] = (min(last[0], col[0]), max(last[1], col[1]))
                 else:
                     merged_columns.append(col)
-        print('🏁 Modified Columns positions ------> ', merged_columns)
+        print('🏁 Modified merged_columns positions ------> ', merged_columns)
+        if len(headerRow) != len(merged_columns):
+            print('Header Didnt matched with merged Column, Swithcing to New Col position')
+            merged_columns = self.identify_columns(self.rows)
         return merged_columns
 
     def find_wrap_keys_in_headers(self,header_rows):
@@ -402,10 +405,10 @@ class TableDetector:
         # print('Inside get table Columns---------->', self.columns)
         # Find matches
         matchedIndex = []
-        
+        print('Last row Identification logic build -> ', self.table_end_y)
         for ridx, eachRow in enumerate(self.rows):
-            if len(self.rows)-1 == ridx:
-                continue # To Skip the last row item from the Detected Table element
+            # if len(self.rows)-1 == ridx:
+            #     continue # To Skip the last row item from the Detected Table element
             rowItem = True
             isLinexclude = False
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
@@ -439,23 +442,28 @@ class TableDetector:
             is_Header_row = self.identify_as_headerRow(row_data)
             print(f'Table detection values in sorted ----> {row_data} and rowItem matched - {rowItem}  and Header Identifiction as {is_Header_row} for Index row {ridx} and non_null_count is {non_null_count}' )
             if non_null_count <= 2 and len(self.table_data) > 0 and rowItem:
+                print('Identified as Table row and for Row  ', rowItem)
                 lastRowItemIdx = len(self.table_data)-1
                 is_LastItem_Header_row = self.identify_as_headerRow(self.table_data[lastRowItemIdx])
                 # print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
                 if is_LastItem_Header_row == False:
+                    print('Inside Identified as Table row and for Row  ', row_data)
                     for eidx, eachCell in enumerate(row_data):
                         # if eachCell != 'null' and eidx <= len(row_data)/2:
                         #     self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
+                        print('Inside Identified as Table row and for Row  ', row_data)
                         if eachCell != 'null' and eidx <= len(row_data)/2 and eidx in matchedIndex:
+                            print('Merging Rows Identified as Table row and for Row  ', rowItem)
                             self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
                             isLinexclude = False
                         else: isLinexclude = True
                         
-                    # if isLinexclude:  self.table_noise_rows.append(row_data)
+                    if isLinexclude:  self.table_noise_rows.append(row_data)
                     continue
                 # else:
                 #     self.table_data.append(row_data)
             elif rowItem or ridx == 0:
+                print('Inside Else Identified as Table row and for Row  ', row_data)
                 self.table_data.append(row_data)
             else: 
                 self.table_noise_rows.append(row_data)

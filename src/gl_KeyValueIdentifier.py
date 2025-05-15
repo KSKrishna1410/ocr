@@ -15,9 +15,6 @@ from src.getKeys4OCRobj import getKeylist
 from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote, cleanedText
 from src.tableMarkingDetection import OCRBoxDrawer, TableDetector
 from src.generateKey_mapping import documentClassifier, generate_key_mapping_remote
-
-
-
 from src.gl_constants import regex_check, feilds_pattern
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)

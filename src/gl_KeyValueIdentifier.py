@@ -44,9 +44,12 @@ class OCRExtractorAndSaver:
         self.result = self.ocr.ocr(self.image_path, cls=True)
         # print('OCR Ext ->' , self.result)
         if not self.result or self.result == [None]:
-            error_log_path = os.path.join(self.output_folder, "error_report.txt")
-            with open(error_log_path, "a", encoding="utf-8") as error_file:
-                error_file.write(f"❌ Failed to process: {self.image_path}\n")
+            # Ensure the folder exists before writing the error file
+            # os.makedirs(self.output_folder, exist_ok=True)
+            # error_log_path = os.path.join(self.output_folder, "error_report.txt")
+            
+            # with open(error_log_path, "a", encoding="utf-8") as error_file:
+            #     error_file.write(f"❌ Failed to process: {self.image_path}\n")
             print(f"❌ OCR extraction failed for {self.image_path}. Logged in error report.")
             return False
 
@@ -198,7 +201,7 @@ class KeyValueIdentifierClass:
         min_x_distance = float('inf')
         key_text = currentKey['standard_key']
         match_candidates = []
-        dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 600
+        dynamicThreshold = 1601 if self.documentMasterInfo[key_text]['dataType'] == 'Double' else 601
         closest_bbox = None
         print(f'Inside Right aligned = {key_text} and dynamicThreshold = {dynamicThreshold}')
         for val_text, val_bbox in self.values:
@@ -222,7 +225,7 @@ class KeyValueIdentifierClass:
                     closest_bbox = val_bbox
                     capturedMethod = 'right_aligned_pair'
                     closest_distance = calculate_distance(key_bbox, closest_bbox)
-                    print('Right-aligned match candidate:', key_text, '-->', val_text, 'with distance', closest_distance, ' -- Dynamic threshold -->', dynamicThreshold)
+                    print('Right-aligned match candidate:', key_text, '-->', closest_value, 'with distance', closest_distance, ' -- Dynamic threshold -->', dynamicThreshold)
                     existing_index = next((i for i, kv in enumerate(self.key_value_pairs) if kv["key"] == key_text and kv["method"] == capturedMethod), None)
                     if feilds_pattern.get(key_text):
                         matches = re.findall(feilds_pattern[key_text], closest_value)
@@ -233,7 +236,7 @@ class KeyValueIdentifierClass:
                     if existing_index is not None:
                         print(f'Right-aligned match candidate at index: {existing_index} , {self.key_value_pairs[existing_index]}')
                     for threshold in range(100, dynamicThreshold, 100):
-                        # print(f'Identified value with in Threshol for { key_text} --> {val_text} and the value is {closest_value} at threshol {threshold} and col_dist {closest_distance}')
+                        print(f'Identified value with in Threshol for { key_text} --> {val_text} and the value is {closest_value} at threshol {threshold} and col_dist {closest_distance}')
                         if closest_value and closest_distance < threshold:
                             print(f'Identified value with in Threshol for { key_text} and the value is {closest_value}')
                             if existing_index is None:

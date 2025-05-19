@@ -120,6 +120,8 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                         pattern = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
                         ifsc_code = extract_first_match(item.get("value"), pattern) or ifsc_code
                         print('🏦 IFSC Code fetched:', ifsc_code)
+        else : 
+            image_paths.remove(image_path)
     return extracted_data, ifsc_code
 
 def enrich_bank_info(ifsc_code, file_name, remote_dir):

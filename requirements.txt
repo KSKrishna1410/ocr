@@ -1,9 +1,10 @@
 # pymupdf
 fuzzywuzzy
 layoutparser
-numpy
-paddleocr
-pandas
+numpy==2.2.6
+paddlepaddle==3.0.0
+paddleocr==2.10.0
+pandas==2.2.3
 pdf2image
 Pillow
 tabula_py

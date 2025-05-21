@@ -37,8 +37,8 @@ RUN . /app/ppenv/bin/activate && \
     pip install --upgrade pip && \
 #    pip install -r requirements.txt	
     pip install \
-	paddlepaddle \
-        paddleocr \
+	paddlepaddle=3.0.0 \
+        paddleocr==2.10.0 \
         pdf2image \
         fuzzywuzzy \
         python-Levenshtein \

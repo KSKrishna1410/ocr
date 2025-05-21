@@ -9,7 +9,7 @@ import statistics
 
 from PIL import Image
 from fuzzywuzzy import fuzz, process  
-from paddleocr import PaddleOCR, draw_ocr
+from paddleocr import PaddleOCR
 
 from src.getKeys4OCRobj import getKeylist
 from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote, cleanedText

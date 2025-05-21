@@ -149,7 +149,6 @@ class TableDetector:
     # space than single-line headers, and the Y-position comparison logic assumes uniform height.
     def identify_rows(self, table_elements, row_threshold=10):
         sorted_data = sorted(table_elements, key=lambda item: item[0][0][1])
-        # print('Inside Identify_rows ----------------> ', sorted_data)
         rows = []
         current_row = []
         last_y = None
@@ -181,7 +180,7 @@ class TableDetector:
             for row in headerRow:
                 rows.remove(row)
             rows.insert(0, merged_row)
-        # print('Returned Rows ------------>' ,rows )
+        print('Returned Rows ------------>' ,rows )
         return rows
     
     def identify_Merged_rows(self, ocr_data):
@@ -266,13 +265,18 @@ class TableDetector:
         headerRow = rows[0]
         print('Identify the Header rows as in identify_columns ######################' , headerRow)
         for ridx , (polygon, (text, conf)) in enumerate(headerRow):
-            if text in self.wrapKeys and ridx >0:
-                print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
-                prvPoly, text = headerRow[ridx-1]
-                x_left = max([pt[0] for pt in prvPoly])
-                new_column_positions[-1] = (new_column_positions[-1][0], x_left)
+            if text.lower() in [key.lower() for key in self.wrapKeys]:
+                if ridx > 0:
+                    print(f'Desc Matched and altered to --->{headerRow[ridx-1]} ')
+                    prvPoly, text = headerRow[ridx-1]
+                    x_left = max([pt[0] for pt in prvPoly])
+                    new_column_positions[-1] = (new_column_positions[-1][0], x_left)
+                elif ridx == 0:
+                    print(f'Desc Matched and altered to Table start left--->{self.get_table_region()[0]} ')
+                    x_left = self.get_table_region()[0]
             else:
-                x_left = min([pt[0] for pt in polygon])
+                x_left = min([pt[0]-30 for pt in polygon])
+                print(f'If Desc not matched ---> {x_left}  and its text {text} and index ridx {ridx}')
                 
             if ridx < len(headerRow)-1:
                 print(f'Identifying the Header row at position {ridx+1} and the current row value {headerRow[ridx+1]}')
@@ -293,14 +297,29 @@ class TableDetector:
         # Step 1: Analyze first N rows (or all rows)
         headerRow = rows[0]
         print('Identify the Header rows as in identify_merged_columns ######################' , headerRow)      
-        # print(f'🏁 Identified Rows ---> {len(rows)} and the row header is {rows[1]}')
-        for row in rows[:row_limit]:
-            print(f'🏁First {row_limit} Identified Rows ---> {len(rows)} and the row header is {row}')
-            if len(row) >= len(headerRow)/2 :
+        i = 0
+        while i < row_limit and i < len(rows):
+            row = rows[i]
+            print(f'🏁 Row {i + 1}/{row_limit} Identified ---> Length: {len(row)}, Header: {row}')
+            
+            if len(row) >= len(headerRow) / 2:
                 for polygon, text in row:
-                    x_left = min([pt[0] for pt in polygon])
-                    x_right = max([pt[0] for pt in polygon])
+                    x_left = min(pt[0] for pt in polygon)
+                    x_right = max(pt[0] for pt in polygon)
                     column_positions.append((x_left, x_right))
+            else:
+                print(f"⚠️ Row {i + 1} too short; increasing row_limit from {row_limit} to {row_limit + 1}")
+                row_limit += 1  # Extend row_limit to consider more rows
+            i += 1
+        
+        # for row in rows[:row_limit]:
+        #     print(f'🏁 Row {idx + 1}/{row_limit} Identified ---> Length: {len(row)}, Header: {row}')
+        #     if len(row) >= len(headerRow)/2 :
+        #         for polygon, text in row:
+        #             x_left = min([pt[0] for pt in polygon])
+        #             x_right = max([pt[0] for pt in polygon])
+        #             column_positions.append((x_left, x_right))
+        #     else: row_limit = 1+row_limit
 
         # Step 2: Sort left positions
         column_positions.sort(key=lambda x: x[0])
@@ -319,7 +338,7 @@ class TableDetector:
                     merged_columns.append(col)
         print('🏁 Modified merged_columns positions ------> ', merged_columns)
         if len(headerRow) != len(merged_columns):
-            print('Header Didnt matched with merged Column, Swithcing to New Col position')
+            print('Header Didnt matched with merged Column, Switching to New Col position')
             merged_columns = self.identify_columns(self.rows)
         return merged_columns
 
@@ -385,7 +404,7 @@ class TableDetector:
 
         # Compute Match Score
         match_score = matched_count / total_items if total_items > 0 else 0
-        print("\nTotal Matches:", matched_count)
+        print("\nTotal Matches:", matched_count, ' for rowItem, ', rowItem)
         # print("Match Score:", f"{match_score:.2f}")
         if matched_count >=1:
             return True
@@ -407,11 +426,13 @@ class TableDetector:
         matchedIndex = []
         print('Last row Identification logic build -> ', self.table_end_y)
         for ridx, eachRow in enumerate(self.rows):
+            # print(f'Processing rows and Cols {ridx} and its row details {eachRow}')
             # if len(self.rows)-1 == ridx:
             #     continue # To Skip the last row item from the Detected Table element
             rowItem = True
             isLinexclude = False
             eachRow = sorted(eachRow, key=lambda x: x[0][0][0])
+            # print('post Sorted row ', eachRow)
             sortedRows.append(eachRow)
             row_data = ['null'] * len(sortedCol)
             for box, (text, conf) in eachRow:
@@ -423,11 +444,13 @@ class TableDetector:
                 if text.lower().strip() in filtered_labels:
                     rowItem = False
                 for idx, (col_start, col_end) in enumerate(sortedCol):
-                    if col_start <= x_center <= col_end:
+                    # print(f'Identifying cell match for {text} and its center {x_center} and col position {col_start} - {col_end}')
+                    if col_start <= x_center <= col_end-15:
                         row_data[idx] = text
+                        # print('row_data pushed ', row_data)
                         break
                 non_null_count = sum(1 for item in row_data if item != 'null')
-            print(row_data)
+            # print('Processed row info ' , row_data)
             if ridx == 0:
                 matches = self.find_wrap_keys_in_headers(row_data)
                 # Print results
@@ -445,9 +468,8 @@ class TableDetector:
                 print('Identified as Table row and for Row  ', rowItem)
                 lastRowItemIdx = len(self.table_data)-1
                 is_LastItem_Header_row = self.identify_as_headerRow(self.table_data[lastRowItemIdx])
-                # print(f' table row data for last index {lastRowItemIdx} and data is {self.table_data[lastRowItemIdx]}')
+                print(f' table row data for last index {is_LastItem_Header_row} and data is {self.table_data[-1]}')
                 if is_LastItem_Header_row == False:
-                    print('Inside Identified as Table row and for Row  ', row_data)
                     for eidx, eachCell in enumerate(row_data):
                         # if eachCell != 'null' and eidx <= len(row_data)/2:
                         #     self.table_data[lastRowItemIdx][eidx] = self.table_data[lastRowItemIdx][eidx] + ' ' + eachCell
@@ -460,8 +482,8 @@ class TableDetector:
                         
                     if isLinexclude:  self.table_noise_rows.append(row_data)
                     continue
-                # else:
-                #     self.table_data.append(row_data)
+                else:
+                    self.table_data.append(row_data)
             elif rowItem or ridx == 0:
                 print('Inside Else Identified as Table row and for Row  ', row_data)
                 self.table_data.append(row_data)

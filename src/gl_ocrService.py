@@ -207,7 +207,15 @@ def compare_array_keys_and_values(array1, array2):
         "diffValuearray": sorted(diffValuearray)
     }
     print("Object Comparision report -------------> ", comparisionRepo)
-    if len(sorted(diffValuearray)) <= 0 :
-        return 'SINGLE_DOC_OBJ', True
-    else:
+    master_list = ['Invoice Date', 'Invoice Number', 'PO No#']
+    # Check if all identified items exist in the master list
+    if any(item in master_list for item in sorted(diffValuearray)):
+        print("✅ Few identified fields exist in the master list.")
         return 'MULTI_DOC_OBJ' ,False
+    else:
+        print("❌ Some identified fields are not in the master list.")
+        return 'SINGLE_DOC_OBJ', True
+    # if len(sorted(diffValuearray)) <= 0 :
+    #     return 'SINGLE_DOC_OBJ', True
+    # else:
+    #     return 'MULTI_DOC_OBJ' ,False

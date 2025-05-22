@@ -364,7 +364,7 @@ class KeyValueIdentifierClass:
             pattern = rule["pattern"]
             key_name = rule["key"]
             for text, bbox, confidence in self.sortedOCRresult:
-                matches = re.findall(pattern, text)
+                matches = re.findall(pattern, text, flags=re.IGNORECASE)
                 for match in matches:
                     self.key_value_pairs.append({
                         "key": key_name,

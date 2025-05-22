@@ -417,7 +417,7 @@ def find_aligned_value(extracted_data, key_info_list, y_tolerance=20):
         # Loop through OCR extracted data
         for entry in extracted_data:
             text, bbox, confidence = entry
-            matches = re.findall(pattern, text)
+            matches = re.findall(pattern, text, flags=re.IGNORECASE)
             
             for match in matches:
                 print(f"[PATTERN MATCH] Found {key_name}: {match} in text: {text}")

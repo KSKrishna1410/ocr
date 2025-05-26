@@ -91,6 +91,7 @@ class DocumentAnalyzer:
         self.keyValueData = []
         self.actual_doc_type = None
         self.tablePosition = []
+        self.paymentsts = ''
         # self.sortedOCRresult = []
         self.sortedOCRresult = [
             (line[1][0].strip(), line[0], line[1][1])
@@ -108,12 +109,15 @@ class DocumentAnalyzer:
         # extracted_data = find_aligned_value(self.extracted_data, self.doc_key_list_array)
         self.keyValueData = keyValueIdentifier.getkey_extractedValues()
         save_extracted_data_remote(self.keyValueData, self.remote_path, self.doc_name)
+        if self.actual_doc_type == "INVOICE":
+            self.paymentsts = self.evaluate_payment_status()
         return self.keyValueData
 
     def _classify_document(self):
         classifier = documentClassifier()
         self.actual_doc_type = classifier.classify_document(self.raw_text.encode("utf-8"))
-        if self.actual_doc_type == "INVOICE":
+        print(f'Document Classified as {self.actual_doc_type}')
+        if self.actual_doc_type in ["INVOICE","CREDIT_NOTE","DEBIT_NOTE"]:
             self.documentMasterInfo = classifier.invoiceMasterInfo
             self.doc_text_lables = classifier.invoice_keywords
         elif self.actual_doc_type == "BANKSTMT":
@@ -158,6 +162,106 @@ class DocumentAnalyzer:
         self.doc_key_list_array = getKeylist(self.result, self.key_mapping_data, self.doc_text_lables)
         for key in self.doc_key_list_array:
             self.doc_key_list.append(key['key'])
+        
+    def pattern_identification_on_text(self):
+        raw_text = self.raw_text
+        results = {}
+
+        # -------------------------
+        # 1. Payment Status Check
+        # -------------------------
+        payment_pattern = re.compile(r"""(?i)
+        (?:
+            (?:mode\s+of\s+payment|payment\s+through|via|settled\s+through|using)?[:\s\-]*
+            (credit\s*card|upi|digital\s+mode|net\s+banking|cash|neft|rtgs)?[,\s\-]*
+        )?
+        .*?
+        (payment\s+(made|completed|received|done|successful(?:ly)?|settled)|paid|payment\s+status\s*[:\-]?\s*(paid|successful))""", re.VERBOSE)
+
+        payment_match = re.search(payment_pattern, raw_text)
+        results["Payment status"] = "PAID" if payment_match else "UNPAID"
+
+        # -------------------------
+        # 2. Document Type Check
+        # -------------------------
+
+        # raw_text_lower = raw_text.lower()
+
+        # # Check for credit card statement
+        # if re.search(r'credit\s*card\s*(statement|number|account|txn|transaction)', raw_text_lower):
+        #     results["Document Type"] = "CREDIT_CARD_STATEMENT"
+
+        # # Check for bank statement
+        # elif re.search(r'bank\s*(statement|account|txn|transaction|balance|ifsc|neft|rtgs)', raw_text_lower):
+        #     results["Document Type"] = "BANKSTMT"
+
+        # # Check for invoice, credit note, debit note
+        # elif re.search(r'\bcredit\s+note\b', raw_text_lower):
+        #     results["Document Type"] = "CREDIT_NOTE"
+        # elif re.search(r'\bdebit\s+note\b', raw_text_lower):
+        #     results["Document Type"] = "DEBIT_NOTE"
+        # elif re.search(r'\binvoice\b|\btax\s+invoice\b', raw_text_lower):
+        #     results["Document Type"] = "INVOICE"
+        # else:
+        #     results["Document Type"] = "unknown"
+
+        return results
+
+    def evaluate_payment_status(self):
+        # -------------------------
+        # 1. Payment Status Check with key and value and derive
+        # -------------------------
+                
+        results = {}
+
+        method_ok = False
+        amount_ok = False
+        txn_id_ok = False
+        pattern_ok = False
+
+        for item in self.keyValueData:
+            print(item)
+            key = item.get("key", "").strip().lower()
+            value = item.get("value", "").strip()
+            doc_text = item.get("doc_text", "").strip().lower().rstrip(":")
+            # Check for Payment Method
+            if doc_text == "payment method" and value.upper() in ["PREPAID", "PRE-PAID"]:
+                print('Mathed with payment method')
+                method_ok = True
+
+            # Check for Amount Paid > 0
+            elif doc_text == "amount paid":
+                try:
+                    amount = float(re.sub(r"[^\d.]", "", value))
+                    if amount > 0:
+                        print('Mathed with Amount paid as amount is' , amount )
+                        amount_ok = True
+                except ValueError:
+                    pass
+
+            # Check for alphanumeric Payment Transaction ID
+            elif doc_text == "payment transaction id":
+                if re.match(r"^[A-Za-z0-9\-]+$", value):
+                    print('Mathed with Payment Trans ID' , value )
+                    txn_id_ok = True
+
+
+            else:
+                payment_pattern = re.compile(r"""(?i)
+                \b(payment\s+(made|completed|received|done|successful(ly)?)|payment\s+status\s*:\s*(paid|successful)|amount\s+(paid|Received))\b""", re.VERBOSE)
+
+                payment_match = re.search(payment_pattern, self.raw_text)
+                if payment_match:
+                    print('Mathed with Pattern on Raw test' , payment_match )
+                    pattern_ok = True
+
+        # If any conditions match, set Payment Status
+        if method_ok or amount_ok or txn_id_ok or pattern_ok:
+            results["Payment status"] = "PAID"
+        else:
+            results["Payment status"] = "UNPAID"
+        print('Payment status identification ' , results)
+        return results       
 
 
 class KeyValueIdentifierClass:
@@ -377,17 +481,16 @@ class KeyValueIdentifierClass:
 
     def getkey_extractedValues(self):
         self.categorize_data()
-        # print('---------------------------------------------------------------------------')
-        # print('at getkey_extractedValues self.key_info_list------>',self.key_info_list)
-        # print('---------------------------------------------------------------------------')
-        # print('at getkey_extractedValues self.documentMasterInfo------>',self.documentMasterInfo)
-        # print('---------------------------------------------------------------------------')
         for eachKey in self.key_info_list:
             print( 'Getting Key details for these feilds ----> ', eachKey["standard_key"] )
             keybbox = json.loads(eachKey["key_bounding_box"])
-            if keybbox is not None and eachKey["value"] is None :
+            if keybbox is not None and (eachKey["value"] is None or eachKey["standard_key"] == 'Payment Status'):
                 if self.docType == 'INVOICE':
-                    if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double": # Non decimal
+                    # print(' printing key details , ', eachKey ) 
+                    if (eachKey["standard_key"] == 'Payment Status'):
+                        self.right_aligned(eachKey)
+                        self.bottom_aligned(eachKey)
+                    elif (self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double"): # Non decimal
                         if self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]: # Search invoice elements above Invoice Line table position item
                             self.right_aligned(eachKey)
                             self.bottom_aligned(eachKey)
@@ -399,18 +502,6 @@ class KeyValueIdentifierClass:
                     self.right_aligned(eachKey)
                     if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
                         self.bottom_aligned(eachKey)
-                # if self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] != "Double":
-                #     if self.docType == 'INVOICE' and self.tablePosition and keybbox[0][1] < self.tablePosition[0][1]:
-                #         match_found = False
-                #         self.right_aligned(eachKey)
-                #         self.bottom_aligned(eachKey)
-                #     elif self.docType != 'INVOICE':
-                #         self.right_aligned(eachKey)
-                #         continue
-                # elif self.documentMasterInfo.get(eachKey["standard_key"])['dataType'] == "Double":
-                #     match_found = False
-                #     self.right_aligned(eachKey)
-                # # if keybbox is not None and eachKey["value"] is None and keybbox[0][1] < self.tablePosition[0][1]:
             elif eachKey["value"] is not None:
                 print(f"Colon match used for: '{eachKey['standard_key']}'")    
                 self.set_key_values(eachKey) #set colon Match values

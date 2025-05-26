@@ -18,7 +18,7 @@ def processOcr(folder_path, docType, file, uniqueId):
         print("❌ No images found for processing.")
         return
 
-    print(f"✅ Found {len(image_paths)} images. Processing...")
+    print(f"✅ Found {len(image_paths)} images. Processing... and the file type is {fileType}")
     finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, len(image_paths))
 
     if docType:
@@ -26,7 +26,7 @@ def processOcr(folder_path, docType, file, uniqueId):
     extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
 
     if len(image_paths) >1 and fileType != 'INVOICE':
-        docCt_Type, isSingle = compare_array_keys_and_values(finalOutput["pageWiseData"][0]["headerInfo"], finalOutput["pageWiseData"][1]["headerInfo"])
+        docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
         print('I got the Doc count as ', docCt_Type)
         finalOutput["isSingleDoc"] = isSingle
         finalOutput["obj_Type"] = docCt_Type
@@ -39,7 +39,7 @@ def processOcr(folder_path, docType, file, uniqueId):
     else:
         bank_name = None
     newTabArray= []
-    if file.lower().endswith(".pdf") and fileType != 'INVOICE':
+    if file.lower().endswith(".pdf") and docType == 'BANKSTMT':
         tableInfo = handle_tabular_data(folder_path, file, remote_dir, docType, bank_name)
         if len(tableInfo) < 1:
             for eachpage in finalOutput["pageWiseData"]:
@@ -55,7 +55,8 @@ def processOcr(folder_path, docType, file, uniqueId):
         #     finalOutput["pageWiseData"][0]['lineInfo']['lineData'] = tableInfo
 
     upload_results(remote_dir, file_name, finalOutput)
-    return finalize_output(finalOutput)
+    return convert_ndarray(finalOutput)
+    # return finalize_output(finalOutput)
 
 def handle_file_upload(folder_path, file, file_name, uniqueId):
     remote_dir = prepareRemotePath(file_name, uniqueId)
@@ -108,6 +109,7 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 "identified_doc_type": analyzer.actual_doc_type,
                 "rawtext": ocr_extraction.raw_text,
                 "headerInfo": extracted_data,
+                "paymentSts": analyzer.paymentsts['Payment status'] if analyzer.actual_doc_type == 'INVOICE' else '',
                 "lineInfo": analyzer.ppOCRTableData
             })
             # ppOCRTableData['lineData']
@@ -159,6 +161,25 @@ def normalize_date(date_str):
     except Exception:
         return date_str
 
+def checkObjLength(finalOutput, imgLen):
+    master_list = ['Invoice Date', 'Invoice Number', 'PO No#']
+    results = []
+    comparisonReport = []
+    
+    for i in range(imgLen - 1):  # Stop at second last item
+        current_header = finalOutput["pageWiseData"][i]["headerInfo"]
+        next_header = finalOutput["pageWiseData"][i + 1]["headerInfo"]
+        comparisonReport = compare_array_keys_and_values(current_header, next_header)
+        results = results + comparisonReport['diffValuearray']
+    
+    # Check if all identified items exist in the master list
+    if any(item in master_list for item in results):
+        print("✅ Few identified fields exist in the master list.")
+        return 'MULTI_DOC_OBJ' ,False
+    else:
+        print("❌ Some identified fields are not in the master list.")
+        return 'SINGLE_DOC_OBJ', True
+
 def compare_array_keys_and_values(array1, array2):
     # Extract unique keys from each array
     keys1 = set(item["key"] for item in array1)
@@ -207,14 +228,8 @@ def compare_array_keys_and_values(array1, array2):
         "diffValuearray": sorted(diffValuearray)
     }
     print("Object Comparision report -------------> ", comparisionRepo)
-    master_list = ['Invoice Date', 'Invoice Number', 'PO No#']
-    # Check if all identified items exist in the master list
-    if any(item in master_list for item in sorted(diffValuearray)):
-        print("✅ Few identified fields exist in the master list.")
-        return 'MULTI_DOC_OBJ' ,False
-    else:
-        print("❌ Some identified fields are not in the master list.")
-        return 'SINGLE_DOC_OBJ', True
+    return comparisionRepo
+    
     # if len(sorted(diffValuearray)) <= 0 :
     #     return 'SINGLE_DOC_OBJ', True
     # else:

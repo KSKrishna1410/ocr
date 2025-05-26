@@ -37,14 +37,6 @@ class TableDetector:
         self.ocr_data = ocr_data
         self.actual_doc_type = actual_doc_type
         self.documentMasterInfo = documentMasterInfo
-        # self.start_keywords = ['Particulars','Package','item', 'CATEGORY','(Rs.)','description', 'qty', 'quantity', 'rate', 'amount', 'hsn', 'price', 
-        #                        'net charges','discount','CGST','Amt','Amount','SGST','(Rate)', 'Taxable', 'Cess','Candidates',
-        #                         'sr', 'no.', 'tax', 'items', 'purchased', 'value']
-        # self.end_keywords = ['Tax Summary','Sub Total','Round Off','Total','Total value', 'grand total', 'invoice total','Totals', 'amount in words','Gross Amount/Total',
-        #                      'Taxable Amount','Gross Amount', 'RUPEES IN WORDS:','Amount Chargeable','Current Total', 'Item Total']
-        # self.wrapKeys= ['Product Description','Item & Description','Description Of Services','Description Of Goods (Mfg Mkt)','Description of','SI Description of Goods No.',
-        #                 'Description/ ISN/UOM City','Description of Service','ITEM(S) PURCHASED','Desc of Goods','Item Description','Item Details','Service Description','Month',
-        #                 'HSN Code and Description','Name of the Product','ITEM NAME','Description','Particulars','ITEM','SI Description of Goods No','Froduct Nane','Package','Description of Goods']
         self.exclude_list = ['9%', '18%']
         self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys'] if self.documentMasterInfo else []
         self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys'] if self.documentMasterInfo else []

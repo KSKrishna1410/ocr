@@ -1,4 +1,5 @@
 import csv
+import re
 from io import StringIO
 from src.gl_utilities import read_file_from_sftp
 
@@ -118,9 +119,18 @@ class documentClassifier:
         bank_score = sum(1 for word in self.bank_keywords if word.lower() in text.lower())
         print(f'Document matched Invoice Score ---> {invoice_score} and Bank stmt score {bank_score}')
         if 5 < invoice_score > bank_score:
-            return "INVOICE"
+            # return "INVOICE"
+            # Check for invoice, credit note, debit note
+            if re.search(r'\bcredit\s+note\b', text.lower()):
+                return "CREDIT_NOTE"
+            elif re.search(r'\bdebit\s+note\b', text.lower()):
+                return "DEBIT_NOTE"
+            else :
+                return "INVOICE"
         elif 5 < bank_score > invoice_score:
             return "BANKSTMT"
+        elif re.search(r'credit\s*card\s*(statement|number|account|txn|transaction)', text.lower()):
+            return "CREDIT_CARD_STATEMENT"
         else:
             return "UNKNOWN"
 

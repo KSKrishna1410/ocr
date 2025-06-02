@@ -8,13 +8,12 @@ pandas==2.2.3
 pdf2image
 Pillow
 tabula_py
-paddlepaddle
 setuptools
 fastapi
 uvicorn
-# pip install fastapi uvicorn psycopg2
 python-multipart
 python-dotenv
 paramiko
 jinja2
+python-Levenshtein
 PyPDF2

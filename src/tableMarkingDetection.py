@@ -37,7 +37,7 @@ class TableDetector:
         self.ocr_data = ocr_data
         self.actual_doc_type = actual_doc_type
         self.documentMasterInfo = documentMasterInfo
-        self.exclude_list = ['9%', '18%']
+        self.exclude_list = ['9%', '18%', 'charges', 'Total Charges']
         self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys'] if self.documentMasterInfo else []
         self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys'] if self.documentMasterInfo else []
         self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys'] if self.documentMasterInfo else []
@@ -53,14 +53,16 @@ class TableDetector:
                (self.table_end_y is None or max(p[1] for p in item[0]) <= self.table_end_y)
         ]
 
-        self.rows = self.identify_rows(self.table_elements)
+        self.desc_column_index = 0
         self.mergedRows = []
-        # self.mergedRows = self.merge_wrapped_text_rows(self.table_elements)
-        self.columns = self.identify_merged_columns(self.rows) if self.actual_doc_type =='INVOICE' else self.identify_columns(self.rows)
         self.table_cord = ''
         self.table_data = []
         self.table_header_info = []
         self.table_noise_rows = []
+        self.headerRow = []
+        self.rows = self.identify_rows(self.table_elements)
+        # self.mergedRows = self.merge_wrapped_text_rows(self.table_elements)
+        self.columns = self.identify_merged_columns(self.rows) if self.actual_doc_type =='INVOICE' else self.identify_columns(self.rows)
         
     def detect_table_start(self):
         sorted_data = sorted(self.ocr_data, key=lambda item: min(p[1] for p in item[0]))
@@ -162,20 +164,26 @@ class TableDetector:
                 headerRow.append(eachRow)
         
         # Merge the extracted rows
-        print('--------------------------------')
+        print('--------------Header Rows------------------')
         print(headerRow)
         print('--------------------------------')
-        merged_row = self.identify_Merged_rows(headerRow)
+        merged_row = self.identify_Merged_header_rows(headerRow)
         
         # Remove the extracted rows from the original list
         if len(merged_row) >0 :
             for row in headerRow:
                 rows.remove(row)
             rows.insert(0, merged_row)
+        print('--------------------------------')
         print('Returned Rows ------------>' ,rows )
-        return rows
+        print('--------------------------------')
+        print('merged_row--------------------------------', merged_row)
+        print('--------------------------------')
+        self.headerRow = merged_row
+        final_rows = self.merge_if_wrapped_rows(rows)
+        return final_rows
     
-    def identify_Merged_rows(self, ocr_data):
+    def identify_Merged_header_rows(self, ocr_data):
         # Step 1: Group cells by approximate column (based on x-coordinates)
         def get_avg_x(bbox):
             return (bbox[0][0] + bbox[1][0] + bbox[2][0] + bbox[3][0]) / 4
@@ -396,13 +404,155 @@ class TableDetector:
 
         # Compute Match Score
         match_score = matched_count / total_items if total_items > 0 else 0
-        print("\nTotal Matches:", matched_count, ' for rowItem, ', rowItem)
+        # print("\nTotal Matches:", matched_count, ' for rowItem, ', rowItem)
         # print("Match Score:", f"{match_score:.2f}")
         if matched_count >=1:
             return True
         else: 
             return False
 
+    def find_description_column_index(self):
+        """Identify the index of the description column in the header row."""
+        for i, cell in enumerate(self.headerRow):
+            text = cell[1][0].lower()  # Extract text and convert to lowercase
+            if any(keyword.lower() in text for keyword in self.wrapKeys):
+                print('Item description found at index position', i)
+                return i
+        return 0  # Default to 0 if no match found
+    
+    def is_footer_row(self, text):
+        # Normalize: remove whitespace, lowercase
+        normalized_text = text.lower().replace(" ", "").strip()
+
+        # List of common footer indicators (use lowercase, no space)
+        footer_keywords = [
+            "total", "netamount", "amountpayable", "grandtotal", "balance", 
+            "summary", "charges", "invoiceamount", "totalcharges",
+            "credit", "debit", "tax", "roundoff", "cgst", "sgst", "igst",
+            "tds", "discount", "add", "less", "additional_ip_chargee"
+        ]
+        
+        # Match using any keyword inside the string
+        return any(keyword in normalized_text for keyword in footer_keywords)
+
+    def get_y_range(self, cell):
+        """Get the y-range (top, bottom) of a cell's bounding box."""
+        return cell[0][0][1], cell[0][2][1]  # [y_top, y_bottom]
+
+    def merge_if_wrapped_rows(self, rows, y_threshold=50):
+        """Check if rows are wrapped and merge them if needed, else return input rows."""
+        # Check if rows are wrapped
+        if not rows or len(rows) < 2:
+            return rows  # Not enough rows to be wrapped, return as is
+
+        # Find the description column index
+        self.desc_column_index = self.find_description_column_index()
+        desc_column_index = self.desc_column_index
+        
+        # Check for wrapping
+        is_wrapped = False
+        i = 1  # Start after header
+        while i < len(rows):
+            current_row = rows[i]
+            if not current_row:
+                i += 1
+                continue
+            
+            # Skip footer rows
+            if len(current_row) > desc_column_index and self.is_footer_row(current_row[desc_column_index][1][0]):
+                i += 1
+                continue
+
+            # Check if the current row has a description
+            if len(current_row) > desc_column_index and current_row[desc_column_index][0][0][0] < 150:
+                item_desc_y_top, item_desc_y_bottom = self.get_y_range(current_row[desc_column_index])
+                
+                # Look for additional description rows or centered values within y_threshold
+                j = i + 1
+                while j < len(rows):
+                    next_row = rows[j]
+                    if not next_row:
+                        j += 1
+                        continue
+                    
+                    next_y_top, next_y_bottom = self.get_y_range(next_row[0]) if next_row else (0, 0)
+                    
+                    # Check if the next row is within y_threshold
+                    if abs(item_desc_y_top - next_y_top) <= y_threshold or abs(item_desc_y_bottom - next_y_bottom) <= y_threshold:
+                        if len(next_row) == 1 and next_row[0][0][0][0] < 150:  # Additional description row
+                            is_wrapped = True
+                        elif len(next_row) > 1:  # Centered values
+                            is_wrapped = True
+                        j += 1
+                    else:
+                        break
+                
+                i = j
+            else:
+                i += 1
+        
+        # If not wrapped, return input rows
+        print('Wrap Data check Condition ---> ',is_wrapped )
+        if not is_wrapped:
+            return rows
+
+        # If wrapped, apply merging logic
+        merged_rows = []
+        i = 0
+        header = rows[0]  # First row is the header
+        merged_rows.append(header)
+        i += 1
+
+        while i < len(rows):
+            current_row = rows[i]
+            if not current_row:
+                i += 1
+                continue
+            
+            # Check if this is a footer row
+            if len(current_row) > desc_column_index and self.is_footer_row(current_row[desc_column_index][1][0]):
+                merged_rows.append(current_row)
+                i += 1
+                continue
+
+            # Start a new merged row with the current row
+            if len(current_row) > desc_column_index and current_row[desc_column_index][0][0][0] < 150:  # Leftmost column check
+                merged_row = current_row[:]
+                item_desc_y_top, item_desc_y_bottom = self.get_y_range(current_row[desc_column_index])
+                
+                # Collect additional rows (descriptions or centered values) within y_threshold
+                j = i + 1
+                while j < len(rows):
+                    next_row = rows[j]
+                    if not next_row:
+                        j += 1
+                        continue
+                    
+                    # Check if the next row is a footer row → STOP merging
+                    if len(next_row) > desc_column_index and self.is_footer_row(next_row[desc_column_index][1][0]):
+                        break
+                    
+                    # Get y-coordinates of the next row's first cell
+                    next_y_top, next_y_bottom = self.get_y_range(next_row[0]) if next_row else (0, 0)
+                    
+                    # Check if the next row is within y_threshold
+                    if abs(item_desc_y_top - next_y_top) <= y_threshold or abs(item_desc_y_bottom - next_y_bottom) <= y_threshold:
+                        if len(next_row) == 1 and next_row[0][0][0][0] < 150:  # Additional description row
+                            merged_row.append(next_row[0])
+                        else:  # Centered values
+                            for cell in next_row:
+                                merged_row.append(cell)
+                        j += 1
+                    else:
+                        break
+                
+                merged_rows.append(merged_row)
+                i = j
+            else:
+                i += 1
+        print('Row returning after Wrapped Check and process ------> ', merged_rows)
+        return merged_rows
+        
     def get_table_info(self):
         header_row = self.rows[0]  # Take the first row as the header
         sortedCol = sorted(self.columns, key=lambda x: x[0])
@@ -412,7 +562,6 @@ class TableDetector:
             for kw in self.doc_text_lables
             if kw.strip() not in self.exclude_list
         ]
-        # print('Inside get_table_info Rows ------------>' ,self.rows )
         # print('Inside get table Columns---------->', self.columns)
         # Find matches
         matchedIndex = []
@@ -427,22 +576,26 @@ class TableDetector:
             # print('post Sorted row ', eachRow)
             sortedRows.append(eachRow)
             row_data = ['null'] * len(sortedCol)
+            print('UnProcessed row info ' , eachRow)
             for box, (text, conf) in eachRow:
                 x_min = min([pt[0] for pt in box])
                 x_max = max([pt[0] for pt in box])
                 x_center = (x_min + x_max) / 2
                 # if text.lower() in [kw.lower().strip() for kw in ['CGST @ 9%','SGST @ 9%','Total']]:
                 # Filter or Clean Extract rows 
-                if text.lower().strip() in filtered_labels:
+                if text.lower().strip() in map(str.lower, filtered_labels):
+                    print(f'Matched with Filter_label text {text}')
                     rowItem = False
                 for idx, (col_start, col_end) in enumerate(sortedCol):
                     # print(f'Identifying cell match for {text} and its center {x_center} and col position {col_start} - {col_end}')
                     if col_start <= x_center <= col_end-15:
-                        row_data[idx] = text
-                        # print('row_data pushed ', row_data)
+                        if row_data[idx] == 'null':
+                            row_data[idx] = text
+                        else:
+                            row_data[idx] += ' ' + text
                         break
                 non_null_count = sum(1 for item in row_data if item != 'null')
-            # print('Processed row info ' , row_data)
+            print('Processed row info ' , row_data)
             if ridx == 0:
                 matches = self.find_wrap_keys_in_headers(row_data)
                 # Print results
@@ -547,75 +700,6 @@ class TableDetector:
                     processed_row.append(text.strip())
                 writer.writerow(processed_row)
         return output_file
-    
-    # def extract_table_data(self, table_cells: List[Dict], headers: List[str], header_coords: List[Tuple[int, int]]) -> List[List[str]]:
-    #     """
-    #     Extracts structured table data from OCR cell info and given headers.
-        
-    #     Args:
-    #         table_cells: List of cell dicts with keys: ['text', 'bbox'].
-    #         headers: The ordered list of header names.
-    #         header_coords: List of x-coordinate range (start_x, end_x) for each column header.
-        
-    #     Returns:
-    #         List of lists: structured rows including headers and corresponding row values.
-    #     """
-    #     table_data = [headers]
-    #     rows_by_y = {}
-
-    #     # Step 1: Group cells by Y-coordinate (rows)
-    #     for cell in table_cells:
-    #         x_min, y_min, x_max, y_max = cell['bbox']
-    #         text = cell['text'].strip()
-    #         row_key = (y_min + y_max) // 2  # approximate row center
-
-    #         if row_key not in rows_by_y:
-    #             rows_by_y[row_key] = []
-
-    #         rows_by_y[row_key].append({
-    #             "text": text,
-    #             "x_center": (x_min + x_max) // 2
-    #         })
-
-    #     # Step 2: Sort rows by their vertical position (top to bottom)
-    #     sorted_row_keys = sorted(rows_by_y.keys())
-    #     for row_key in sorted_row_keys:
-    #         row = rows_by_y[row_key]
-    #         row_cells = [""] * len(headers)
-
-    #         # Step 3: Match each cell to the correct column based on x_center
-    #         for cell in row:
-    #             x = cell["x_center"]
-    #             text = cell["text"]
-    #             for i, (x_start, x_end) in enumerate(header_coords):
-    #                 if x_start <= x <= x_end:
-    #                     row_cells[i] = text
-    #                     break
-
-    #         # Check if at least one column is non-empty before appending
-    #         if any(val != "" for val in row_cells):
-    #             table_data.append(row_cells)
-
-    #     return table_data
-
-    
-    
-    
-    
-    
-    # def draw_table_cell(self, image, rows, columns):
-    #     for row in rows:
-    #         y_coords = [pt[0][1] for pt, _ in row]
-    #         height = max([max(pt[1] for pt in polygon) for polygon, _ in row]) - min([min(pt[1] for pt in polygon) for polygon, _ in row])
-    #         y = int(np.mean(y_coords))
-
-    #         for col in columns:
-    #             x1, x2 = col
-    #             top_left = (x1, y)
-    #             bottom_right = (x2, y + height)
-    #             cv2.rectangle(image, top_left, bottom_right, (0, 255, 255), 1)  # Yellow cells
-
-    #     return image
 
 class SFTPUploader:
     def __init__(self, host, port, username, password, sftp_folder):

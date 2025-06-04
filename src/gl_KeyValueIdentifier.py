@@ -109,8 +109,13 @@ class DocumentAnalyzer:
         # extracted_data = find_aligned_value(self.extracted_data, self.doc_key_list_array)
         self.keyValueData = keyValueIdentifier.getkey_extractedValues()
         save_extracted_data_remote(self.keyValueData, self.remote_path, self.doc_name)
-        if self.actual_doc_type == "INVOICE":
-            self.paymentsts = self.evaluate_payment_status()
+        if self.actual_doc_type in ["INVOICE","DEBIT_NOTE"]:
+            paymentObj = self.evaluate_payment_status()
+            self.paymentsts = paymentObj['Payment status']
+        elif self.actual_doc_type == "CREDIT_NOTE":
+            self.paymentsts ='PAID'
+        else:
+            self.paymentsts = None 
         return self.keyValueData
 
     def _classify_document(self):

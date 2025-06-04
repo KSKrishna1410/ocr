@@ -109,7 +109,7 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 "identified_doc_type": analyzer.actual_doc_type,
                 "rawtext": ocr_extraction.raw_text,
                 "headerInfo": extracted_data,
-                "paymentSts": analyzer.paymentsts['Payment status'] if analyzer.actual_doc_type == 'INVOICE' else '',
+                "paymentSts": analyzer.paymentsts,
                 "lineInfo": analyzer.ppOCRTableData
             })
             # ppOCRTableData['lineData']

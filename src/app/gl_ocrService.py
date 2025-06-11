@@ -2,13 +2,16 @@ import os
 import json
 from uuid import uuid4
 
-from src.gl_convert_pdftoImage import pdf2ImageMethod
-from src.gl_KeyValueIdentifier import OCRExtractorAndSaver, DocumentAnalyzer
-from src.generateKey_mapping import generate_key_mapping_remote
-from src.gl_mPgTableExtraction import runTabuleProcess_file
-from src.gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray
+from src.config.config import database
+from src.config.db.models import ocr_documents
 
-def processOcr(folder_path, docType, file, uniqueId):
+from src.app.gl_convert_pdftoImage import pdf2ImageMethod
+from src.app.gl_KeyValueIdentifier import OCRExtractorAndSaver, DocumentAnalyzer
+from src.app.generateKey_mapping import generate_key_mapping_remote
+from src.app.gl_mPgTableExtraction import runTabuleProcess_file
+from src.app.gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray
+
+def processOcr(folder_path, docType, file, uniqueId, docId):
     print(f"\U0001F4C2 Inside main function:")
     file_name = os.path.splitext(file)[0]
     remote_dir, remote_path = handle_file_upload(folder_path, file, file_name, uniqueId)
@@ -17,22 +20,20 @@ def processOcr(folder_path, docType, file, uniqueId):
     if not image_paths:
         print("❌ No images found for processing.")
         return
-
     print(f"✅ Found {len(image_paths)} images. Processing... and the file type is {fileType}")
-    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, len(image_paths))
+    if len(image_paths) >1 and fileType != 'INVOICE':
+        docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
+        print('I got the Doc count as ', docCt_Type)
+    else: 
+        isSingle = True
+        docCt_Type = 'SINGLE_DOC_OBJ'
+    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, isSingle, docCt_Type, len(image_paths))
 
     if docType:
         keyMappingData = generate_key_mapping_remote(docType)
     extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
 
-    if len(image_paths) >1 and fileType != 'INVOICE':
-        docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
-        print('I got the Doc count as ', docCt_Type)
-        finalOutput["isSingleDoc"] = isSingle
-        finalOutput["obj_Type"] = docCt_Type
-    else: 
-        finalOutput["isSingleDoc"] = True
-        finalOutput["obj_Type"] = 'SINGLE_DOC_OBJ'
+
     
     if ((docType == 'BANKSTMT' or fileType== 'BANKSTMT') and ifsc_code):
         bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
@@ -72,15 +73,15 @@ def handle_image_conversion(folder_path, file, remote_dir):
     print("❌ Unsupported file format.")
     return [], None
 
-def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, ct):
+def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType,isSingle, docCt_Type, ct):
     return {
         "processId": uniqueId,
         "filePath": remote_path,
         "fileDir": remote_dir,
         "document_type": docType.upper() if docType else None,
         "page_cnt": ct,
-        "isSingleDoc": '',
-        "obj_Type": '',
+        "isSingleDoc": isSingle,
+        "obj_Type": docCt_Type,
         "fileType": fileType,
         "pageWiseData": [],
         "lineTabulaData": []

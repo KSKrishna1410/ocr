@@ -1,7 +1,7 @@
 import csv
 import re
 from io import StringIO
-from src.gl_utilities import read_file_from_sftp
+from src.app.gl_utilities import read_file_from_sftp
 
 def generate_key_mapping(doctype):
     key_mapping = {}

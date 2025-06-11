@@ -5,7 +5,7 @@ import PyPDF2
 from PIL import Image
 from pdf2image import convert_from_path
 from io import BytesIO
-from src.gl_utilities import upload_to_sftp
+from src.app.gl_utilities import upload_to_sftp
 
 # Get the current script directory
 current_dir = os.path.dirname(os.path.abspath(__file__))

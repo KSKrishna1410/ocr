@@ -1,11 +1,11 @@
 import tabula
 import pandas as pd
-from tabula import read_pdf
 import os
 import re
 import numpy as np
 import csv
-from src.gl_utilities import cleanTabulaData
+from tabula import read_pdf
+from src.app.gl_utilities import cleanTabulaData
 # import pyPdf
 
 

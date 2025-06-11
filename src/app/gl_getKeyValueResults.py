@@ -1,19 +1,19 @@
 import cv2
 import numpy as np
-from paddleocr import PaddleOCR, draw_ocr
-from fuzzywuzzy import fuzz, process  
-from src.getKeys4OCRobj import *
+import statistics
 import json
 import math
 import os
 import csv
-from src.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
-import statistics
-from src.tableMarkingDetection import OCRBoxDrawer, TableDetector
+from paddleocr import PaddleOCR, draw_ocr
+from fuzzywuzzy import fuzz, process  
 from PIL import Image
 from gl_mistral import analyze_text_with_ai
-from src.gl_constants import regex_check
-from src.generateKey_mapping import documentClassifier, generate_key_mapping_remote
+from src.app.getKeys4OCRobj import *
+from src.app.gl_utilities import save_extracted_data, upload_to_sftp, save_extracted_data_remote
+from src.app.tableMarkingDetection import OCRBoxDrawer, TableDetector
+from src.app.gl_constants import regex_check
+from src.app.generateKey_mapping import documentClassifier, generate_key_mapping_remote
 
 # Initialize OCR with enhanced settings
 ocr = PaddleOCR(use_angle_cls=True, lang='en', rec_algorithm='CRNN', det_db_box_thresh=0.5)

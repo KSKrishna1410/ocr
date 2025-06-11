@@ -3,8 +3,8 @@ import numpy as np
 import csv
 import os
 import paramiko
-from typing import List, Tuple
 import re
+from typing import List, Tuple
 
 
 class OCRBoxDrawer:

@@ -18,46 +18,70 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from uuid import uuid4
 from typing import Optional, Literal
 from pathlib import Path
 from datetime import datetime
 
-from src.gl_convert_pdftoImage import pdf2ImageMethod
-from src.gl_ocrService import processOcr
-from src.gl_utilities import upload_to_sftp,convert_ndarray
+from src.app.gl_convert_pdftoImage import pdf2ImageMethod
+from src.app.gl_ocrService import processOcr
+from src.app.gl_utilities import upload_to_sftp,convert_ndarray
 
-
+from src.config.config import database
+from src.config.db.models import ocr_documents
+from src.config.db.init_db import init_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 app = FastAPI(docs_url=None, redoc_url=None)
-
+# Path to your templates folder
+templates = Jinja2Templates(directory="templates")
 # Serve static files (CSS/JS) for Swagger UI
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "lib"), name="static")
+
+# Ensure temp directory exists
+TEMP_DIR = "app/temp_uploads"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+
+# @app.on_event("startup")
+# async def startup():
+#     logger.info("glByte InHouse OCR Application is starting up...")
+#     init_db()
+#     await database.connect()
+#     logger.info("glByte InHouse OCR Application is Started Successfully...")
+
+# @app.on_event("shutdown")
+# async def shutdown():
+#     await database.disconnect()
+#     logger.info("glByte InHouse OCR Application disconneted Successfully...")
+
 
 # Serve custom Swagger UI
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
     return FileResponse("app/static/swagger-ui/index.html")
 
-# Path to your templates folder
-templates = Jinja2Templates(directory="templates")
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("glByte InHouse OCR Application is starting up...")
-
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Ensure temp directory exists
-TEMP_DIR = "app/temp_uploads"
-os.makedirs(TEMP_DIR, exist_ok=True)
+# # ✅ Dummy POST to insert test row
+# @app.post("/test_db_insert")
+# async def test_db_insert():
+#     try:
+#         query = ocr_documents.insert().values(
+#             file_name="test_invoice.pdf",
+#             status="TEST_SUCCESS",
+#             creation_date=datetime.now()
+#         )
+#         inserted_id = await database.execute(query)
+#         return {"status": "Success", "inserted_id": inserted_id}
+#     except Exception as e:
+#         return {"status": "Failed", "error": str(e)}
 
 @app.post("/ocr_process/")
 async def ocr_process_file(
@@ -70,6 +94,7 @@ async def ocr_process_file(
         # Create a unique filename
         uniqueId = str(uuid4())
         temp_dir = os.path.join(TEMP_DIR,uniqueId)
+        start_time = datetime.now()
         # temp_file_name = f"{uuid4()}_{file.filename}"
         temp_file_name = file.filename
         temp_file_path = os.path.join(temp_dir, temp_file_name)
@@ -77,12 +102,24 @@ async def ocr_process_file(
         # Save file to temp folder
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+        # inserted_id = await database.execute(
+        #     ocr_documents.insert().values(
+        #         file_name=file.filename,
+        #         actual_doc_type=doctype,
+        #         creation_date=datetime.now(),
+        #         process_id = uniqueId,
+        #         doc_path = temp_file_name,
+        #     )
+        # )
         # file_id = str(uuid.uuid4())
         print(f"Filename: {file.filename} and the file path {temp_file_path}")  # Print or store it for further use
         ocrObject = processOcr(temp_dir, doctype,temp_file_name,uniqueId)
         # ocrObject = processOcr_new(temp_dir, doctype,temp_file_name,uniqueId)
         cleaned_ocrObject = convert_ndarray(ocrObject)
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        # print(f'Data upload in the DB Successfully and id is {inserted_id}')
         shutil.rmtree(temp_dir)
         return {"status_code":200,"status":'Success',"data": cleaned_ocrObject}
     except Exception as e:

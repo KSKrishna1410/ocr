@@ -11,7 +11,7 @@ from src.app.generateKey_mapping import generate_key_mapping_remote
 from src.app.gl_mPgTableExtraction import runTabuleProcess_file
 from src.app.gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray
 
-def processOcr(folder_path, docType, file, uniqueId, docId):
+def processOcr(folder_path, docType, file, uniqueId):
     print(f"\U0001F4C2 Inside main function:")
     file_name = os.path.splitext(file)[0]
     remote_dir, remote_path = handle_file_upload(folder_path, file, file_name, uniqueId)

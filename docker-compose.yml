@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    container_name: nekkanti_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: nekkanti
+      POSTGRES_PASSWORD: nekkanti_pass
+      POSTGRES_DB: nekkanti_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nekkanti_app
+    restart: always
+    ports:
+      - "8888:8888"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://nekkanti:nekkanti_pass@db:5432/nekkanti_db
+    volumes:
+      - ./src:/app/src
+      - ./templates:/app/templates
+      - ./lib:/app/lib
+      - ./app:/app/app
+      - /app/__pycache__
+
+volumes:
+  postgres_data: 

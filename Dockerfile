@@ -25,36 +25,37 @@ RUN apt-get update && \
     poppler-utils \
     default-jre \
     curl \
-    git && \
+    git \
+    netcat-traditional && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create and activate a virtual environment
 RUN python3 -m venv /app/ppenv
 
+# Copy project files (including requirements.txt and CSV files)
+COPY . .
+
 # Install Python dependencies inside venv
 RUN . /app/ppenv/bin/activate && \
     pip install --upgrade pip && \
-#    pip install -r requirements.txt	
-    pip install \
-	paddlepaddle==3.0.0 \
-        paddleocr==2.10.0 \
-        pdf2image \
-        fuzzywuzzy \
-        python-Levenshtein \
-        pandas \
-        pillow \
-        tabula-py \
-        fastapi \
-        uvicorn \
-        python-multipart \
-        python-dotenv \
-        paramiko \
-        jinja2 \
-        PyPDF2
-
-# Copy project files
-COPY . .
+   pip install -r requirements.txt	
+    # pip install \
+	# paddlepaddle==3.0.0 \
+    #     paddleocr==2.10.0 \
+    #     pdf2image \
+    #     fuzzywuzzy \
+    #     python-Levenshtein \
+    #     pandas \
+    #     pillow \
+    #     tabula-py \
+    #     fastapi \
+    #     uvicorn \
+    #     python-multipart \
+    #     python-dotenv \
+    #     paramiko \
+    #     jinja2 \
+    #     PyPDF2
 
 RUN echo "source /app/ppenv/bin/activate" >> /root/.bashrc
 #RUN "uvicorn main_api:app --port 8888"

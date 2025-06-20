@@ -17,3 +17,8 @@ paramiko
 jinja2
 python-Levenshtein
 PyPDF2
+sqlalchemy
+databases
+paramiko
+asyncpg
+psycopg2-binary

@@ -4,6 +4,7 @@ import csv
 import os
 import paramiko
 import re
+import shutil
 from typing import List, Tuple
 
 
@@ -38,9 +39,13 @@ class TableDetector:
         self.actual_doc_type = actual_doc_type
         self.documentMasterInfo = documentMasterInfo
         self.exclude_list = ['9%', '18%', 'charges', 'Total Charges']
-        self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys'] if self.documentMasterInfo else []
-        self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys'] if self.documentMasterInfo else []
-        self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys'] if self.documentMasterInfo else []
+        # self.start_keywords = self.documentMasterInfo['table_start_position']['fieldKeys'] if self.documentMasterInfo else []
+        # self.end_keywords = self.documentMasterInfo['table_end_position']['fieldKeys'] if self.documentMasterInfo else []
+        # self.wrapKeys = self.documentMasterInfo['Description']['fieldKeys'] if self.documentMasterInfo else []
+        self.start_keywords = self.documentMasterInfo.get('table_start_position', {}).get('fieldKeys', []) if self.documentMasterInfo else []
+        self.end_keywords = self.documentMasterInfo.get('table_end_position', {}).get('fieldKeys', []) if self.documentMasterInfo else []
+        self.wrapKeys = self.documentMasterInfo.get('Description', {}).get('fieldKeys', []) if self.documentMasterInfo else []
+        
         self.file_name = doc_name
         self.table_start_y = self.detect_table_start()
         self.table_end_y = self.detect_table_end()
@@ -701,22 +706,31 @@ class TableDetector:
                 writer.writerow(processed_row)
         return output_file
 
-class SFTPUploader:
+class LocalFileUploader:
     def __init__(self, host, port, username, password, sftp_folder):
-        self.host = host
-        self.port = port
-        self.username = username
-        self.password = password
-        self.sftp_folder = sftp_folder
+        # For local handling, we ignore SFTP parameters and use local paths
+        self.local_folder = sftp_folder
 
     def upload_file(self, local_path: str, remote_filename: str):
-        transport = paramiko.Transport((self.host, self.port))
-        transport.connect(username=self.username, password=self.password)
-        sftp = paramiko.SFTPClient.from_transport(transport)
+        try:
+            # Ensure the directory exists
+            os.makedirs(self.local_folder, exist_ok=True)
+            
+            # Create the destination path
+            destination_path = os.path.join(self.local_folder, remote_filename)
+            
+            # Copy the file
+            shutil.copy2(local_path, destination_path)
+            
+            print(f"💾 File saved locally: {local_path} -> {destination_path}")
+        except Exception as e:
+            print(f"❌ Error saving file locally: {e}")
+            raise e
 
-        sftp.chdir(self.sftp_folder)
-        sftp.put(local_path, remote_filename)
+class SFTPUploader:
+    def __init__(self, host, port, username, password, sftp_folder):
+        # Use local file uploader instead of SFTP
+        self.uploader = LocalFileUploader(host, port, username, password, sftp_folder)
 
-        sftp.close()
-        transport.close()
-        print(f"Uploaded {local_path} to SFTP as {remote_filename}")
+    def upload_file(self, local_path: str, remote_filename: str):
+        return self.uploader.upload_file(local_path, remote_filename)

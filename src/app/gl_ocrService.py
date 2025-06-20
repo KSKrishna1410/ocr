@@ -1,47 +1,55 @@
 import os
 import json
+import shutil
 from uuid import uuid4
 
-from src.config.config import database
-from src.config.db.models import ocr_documents
+# from src.config.config import database
+# from src.config.db.models import ocr_documents
 
 from src.app.gl_convert_pdftoImage import pdf2ImageMethod
 from src.app.gl_KeyValueIdentifier import OCRExtractorAndSaver, DocumentAnalyzer
 from src.app.generateKey_mapping import generate_key_mapping_remote
 from src.app.gl_mPgTableExtraction import runTabuleProcess_file
-from src.app.gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray
+from src.app.gl_utilities import get_bank_name, extract_first_match, saveBankInfo, cleanTabulaData_remote, upload_to_sftp,prepareRemotePath,convert_ndarray, move_files_pagewise_sftp
 
 def processOcr(folder_path, docType, file, uniqueId):
     print(f"\U0001F4C2 Inside main function:")
     file_name = os.path.splitext(file)[0]
-    remote_dir, remote_path = handle_file_upload(folder_path, file, file_name, uniqueId)
-    image_paths, fileType = handle_image_conversion(folder_path, file, remote_dir)
+    local_dir, local_path = handle_file_upload(folder_path, file, file_name, uniqueId)
+    image_paths, fileType = handle_image_conversion(folder_path, file, local_dir)
     keyMappingData = []
     if not image_paths:
         print("❌ No images found for processing.")
         return
     print(f"✅ Found {len(image_paths)} images. Processing... and the file type is {fileType}")
-    if len(image_paths) >1 and fileType != 'INVOICE':
-        docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
-        print('I got the Doc count as ', docCt_Type)
-    else: 
-        isSingle = True
-        docCt_Type = 'SINGLE_DOC_OBJ'
-    finalOutput = initialize_output(uniqueId, remote_path, remote_dir, docType, fileType, isSingle, docCt_Type, len(image_paths))
+    # if len(image_paths) >1 and fileType != 'INVOICE':
+    #     docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
+    #     print('I got the Doc count as ', docCt_Type)
+    # else: 
+    #     isSingle = True
+    #     docCt_Type = 'SINGLE_DOC_OBJ'
+    finalOutput = initialize_output(uniqueId, local_path, local_dir, docType, fileType, len(image_paths))
 
     if docType:
         keyMappingData = generate_key_mapping_remote(docType)
-    extracted_data, ifsc_code = process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType)
+    extracted_data, ifsc_code = process_images(image_paths, local_dir, keyMappingData, finalOutput, docType)
 
-
+    if len(image_paths) >1 and fileType != 'INVOICE':
+        docCt_Type, isSingle = checkObjLength(finalOutput, len(image_paths))
+        print('I got the Doc count as ', docCt_Type)
+        finalOutput["isSingleDoc"] = isSingle
+        finalOutput["obj_Type"] = docCt_Type
+    else: 
+        finalOutput["isSingleDoc"] = True
+        finalOutput["obj_Type"] = 'SINGLE_DOC_OBJ'
     
     if ((docType == 'BANKSTMT' or fileType== 'BANKSTMT') and ifsc_code):
-        bank_name = enrich_bank_info(ifsc_code, file_name, remote_dir)
+        bank_name = enrich_bank_info(ifsc_code, file_name, local_dir)
     else:
         bank_name = None
     newTabArray= []
     if file.lower().endswith(".pdf") and docType == 'BANKSTMT':
-        tableInfo = handle_tabular_data(folder_path, file, remote_dir, docType, bank_name)
+        tableInfo = handle_tabular_data(folder_path, file, local_dir, docType, bank_name)
         if len(tableInfo) < 1:
             for eachpage in finalOutput["pageWiseData"]:
                 if eachpage['lineInfo'] and eachpage['lineInfo']['lineData']:
@@ -55,45 +63,54 @@ def processOcr(folder_path, docType, file, uniqueId):
         # if len(tableInfo) > 2:
         #     finalOutput["pageWiseData"][0]['lineInfo']['lineData'] = tableInfo
 
-    upload_results(remote_dir, file_name, finalOutput)
+    upload_results(local_dir, file_name, finalOutput,finalOutput["obj_Type"])
     return convert_ndarray(finalOutput)
     # return finalize_output(finalOutput)
 
 def handle_file_upload(folder_path, file, file_name, uniqueId):
-    remote_dir = prepareRemotePath(file_name, uniqueId)
-    file_path = os.path.join(folder_path, file)
-    with open(file_path, "rb") as f:
-        remote_path = upload_to_sftp(f.read(), file, remote_dir)
-    print(f"🌐 SFTP Path: {remote_path}")
-    return remote_dir, remote_path
+    # Save file locally instead of uploading to SFTP
+    local_dir = os.path.join(folder_path, "local_uploads")
+    os.makedirs(local_dir, exist_ok=True)
+    local_path = os.path.join(local_dir, file_name)
+    
+    # file is a path, so we need to copy from the source path
+    source_path = os.path.join(folder_path, file)
+    if os.path.exists(source_path):
+        shutil.copy2(source_path, local_path)
+        print(f"💾 Saved locally: {local_path}")
+    else:
+        print(f"❌ Source file not found: {source_path}")
+        raise FileNotFoundError(f"Source file not found: {source_path}")
+    
+    return local_dir, local_path
 
-def handle_image_conversion(folder_path, file, remote_dir):
+def handle_image_conversion(folder_path, file, local_dir):
     if file.lower().endswith((".jpg", ".jpeg", ".png", ".pdf")):
-        return pdf2ImageMethod(folder_path, remote_dir, folder_path, file)
+        return pdf2ImageMethod(folder_path, local_dir, folder_path, file)
     print("❌ Unsupported file format.")
     return [], None
 
-def initialize_output(uniqueId, remote_path, remote_dir, docType, fileType,isSingle, docCt_Type, ct):
+def initialize_output(uniqueId, local_path, local_dir, docType, fileType,ct):
     return {
         "processId": uniqueId,
-        "filePath": remote_path,
-        "fileDir": remote_dir,
+        "filePath": local_path,
+        "fileDir": local_dir,
         "document_type": docType.upper() if docType else None,
         "page_cnt": ct,
-        "isSingleDoc": isSingle,
-        "obj_Type": docCt_Type,
+        "isSingleDoc": '',
+        "obj_Type": '',
         "fileType": fileType,
         "pageWiseData": [],
         "lineTabulaData": []
     }
 
-def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType):
+def process_images(image_paths, local_dir, keyMappingData, finalOutput, docType):
     ifsc_code = None
     for index, image_path in enumerate(image_paths):
         print(f"\n🔍 Processing Image: {image_path}")
         page_file_name = os.path.splitext(os.path.basename(image_path))[0]
 
-        ocr_extraction = OCRExtractorAndSaver(image_path, page_file_name, remote_dir)
+        ocr_extraction = OCRExtractorAndSaver(image_path, page_file_name, local_dir)
         if ocr_extraction.perform_ocr_and_save():
             analyzer = DocumentAnalyzer(
                 doc_name=page_file_name,
@@ -102,7 +119,7 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 raw_text=ocr_extraction.raw_text,
                 key_mapping_data=keyMappingData,
                 sftp_uploader=upload_to_sftp,
-                remote_path=remote_dir
+                remote_path=local_dir
             )
             extracted_data = analyzer.analyze_and_extract()
             finalOutput["pageWiseData"].append({
@@ -111,7 +128,8 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
                 "rawtext": ocr_extraction.raw_text,
                 "headerInfo": extracted_data,
                 "paymentSts": analyzer.paymentsts,
-                "lineInfo": analyzer.ppOCRTableData
+                "lineInfo": analyzer.ppOCRTableData,
+                "pageWiseFilePath": f"{local_dir}/page{index + 1}"
             })
             # ppOCRTableData['lineData']
             if isinstance(extracted_data, str):
@@ -127,23 +145,34 @@ def process_images(image_paths, remote_dir, keyMappingData, finalOutput, docType
             image_paths.remove(image_path)
     return extracted_data, ifsc_code
 
-def enrich_bank_info(ifsc_code, file_name, remote_dir):
+def enrich_bank_info(ifsc_code, file_name, local_dir):
     print('📘 Fetching bank details for IFSC...')
     bankDetails = get_bank_name(ifsc_code)
     print('🏦 BankInfo:', bankDetails)
-    saveBankInfo(bankDetails, file_name, remote_dir)
+    saveBankInfo(bankDetails, file_name, local_dir)
     return bankDetails.get("BANK")
 
-def handle_tabular_data(folder_path, file, remote_dir, docType, bank_name):
+def handle_tabular_data(folder_path, file, local_dir, docType, bank_name):
     tableInfo = runTabuleProcess_file(os.path.join(folder_path, file))
     if tableInfo:
-        return cleanTabulaData_remote(remote_dir, tableInfo, docType, file, bank_name)
+        return cleanTabulaData_remote(local_dir, tableInfo, docType, file, bank_name)
     return []
 
-def upload_results(remote_dir, file_name, finalOutput):
+def upload_results(local_dir, file_name, finalOutput, objType):
+    # Save results locally instead of uploading to SFTP
     json_str = json.dumps(finalOutput, indent=4, default=convert_ndarray)
-    remote_file_name = f"{file_name}_final.json"
-    upload_to_sftp(json_str.encode("utf-8"), remote_file_name, remote_dir)
+    local_file_name = f"{file_name}_final.json"
+    local_file_path = os.path.join(local_dir, local_file_name)
+    
+    with open(local_file_path, "w") as f:
+        f.write(json_str)
+    
+    print(f"💾 Results saved locally: {local_file_path}")
+    
+    # Remove SFTP upload calls for now
+    # upload_to_sftp(json_str.encode("utf-8"), remote_file_name, local_dir)
+    # if objType == 'MULTI_DOC_OBJ':
+    #     move_files_pagewise_sftp(file_name,local_dir)
 
 def finalize_output(finalOutput):
     if not finalOutput.get("lineTabulaData") and finalOutput.get("fileType") != 'Image':

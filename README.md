@@ -74,8 +74,6 @@ python .\main.py "C:\Users\Documents\PaddleOCR_research\inputs" "C:\Users\Docume
 ## Contributing
 Feel free to contribute by submitting issues or pull requests.
 
-## License
-This project is licensed under the **MIT License**.
 
 
 # python .\main.py "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\inputs" "C:\Users\nisha\Documents\ProductDevelopement\OpenSourceModel\PaddleOCR_research\std_code\v3\inputs\images"

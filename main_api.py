@@ -29,14 +29,14 @@ from src.app.gl_ocrService import processOcr
 from src.app.gl_utilities import upload_to_sftp,convert_ndarray
 
 from src.config.config import database
-from src.config.db.models import ocr_documents
+# from src.config.db.models import ocr_documents
 from src.config.db.init_db import init_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI(docs_url=None, redoc_url=None)
+app = FastAPI(docs_url="/docs", redoc_url="/redoc")
 # Path to your templates folder
 templates = Jinja2Templates(directory="templates")
 # Serve static files (CSS/JS) for Swagger UI
@@ -47,41 +47,52 @@ TEMP_DIR = "app/temp_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-# @app.on_event("startup")
-# async def startup():
-#     logger.info("glByte InHouse OCR Application is starting up...")
-#     init_db()
-#     await database.connect()
-#     logger.info("glByte InHouse OCR Application is Started Successfully...")
+@app.on_event("startup")
+async def startup():
+    try:
+        logger.info("glByte InHouse OCR Application is starting up...")
+        init_db()
+        logger.info("Database initialization completed")
+        await database.connect()
+        logger.info("Database connection established")
+        logger.info("glByte InHouse OCR Application is Started Successfully...")
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
 
-# @app.on_event("shutdown")
-# async def shutdown():
-#     await database.disconnect()
-#     logger.info("glByte InHouse OCR Application disconneted Successfully...")
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
+    logger.info("glByte InHouse OCR Application disconneted Successfully...")
 
 
-# Serve custom Swagger UI
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
-    return FileResponse("app/static/swagger-ui/index.html")
+# @app.get("/docs", include_in_schema=False)
+# async def custom_swagger_ui_html():
+#     return FileResponse("app/static/swagger-ui/index.html")
+
+@app.get("/test", response_class=HTMLResponse)
+async def test_endpoint():
+    return {"message": "FastAPI is working!", "docs_url": "/docs", "redoc_url": "/redoc"}
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # # ✅ Dummy POST to insert test row
-# @app.post("/test_db_insert")
-# async def test_db_insert():
-#     try:
-#         query = ocr_documents.insert().values(
-#             file_name="test_invoice.pdf",
-#             status="TEST_SUCCESS",
-#             creation_date=datetime.now()
-#         )
-#         inserted_id = await database.execute(query)
-#         return {"status": "Success", "inserted_id": inserted_id}
-#     except Exception as e:
-#         return {"status": "Failed", "error": str(e)}
+@app.post("/test_db_insert")
+async def test_db_insert():
+    try:
+        query = ocr_documents.insert().values(
+            file_name="test_invoice.pdf",
+            status="TEST_SUCCESS",
+            creation_date=datetime.now()
+        )
+        inserted_id = await database.execute(query)
+        return {"status": "Success", "inserted_id": inserted_id}
+    except Exception as e:
+        return {"status": "Failed", "error": str(e)}
 
 @app.post("/ocr_process/")
 async def ocr_process_file(
@@ -111,7 +122,7 @@ async def ocr_process_file(
         #         doc_path = temp_file_name,
         #     )
         # )
-        # file_id = str(uuid.uuid4())
+        file_id = str(uuid.uuid4())
         print(f"Filename: {file.filename} and the file path {temp_file_path}")  # Print or store it for further use
         ocrObject = processOcr(temp_dir, doctype,temp_file_name,uniqueId)
         # ocrObject = processOcr_new(temp_dir, doctype,temp_file_name,uniqueId)
@@ -167,89 +178,74 @@ async def ocr_batch_process_sftp(
     folder_path: str = Form(...),
     doctype: Literal["INVOICE", "BANKSTMT"] = Form(...)
 ):
-    # SFTP Config
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
-
+    # Local file handling instead of SFTP
     processed = []
 
     try:
-        # Connect to SFTP
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        # Verify folder exists
-        try:
-            sftp.chdir(folder_path)
-        except FileNotFoundError:
+        # Check if folder exists locally
+        if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
             return {"error": "Invalid folder path"}
 
-        # List files in remote directory
-        remote_files = sftp.listdir(folder_path)
+        # List files in local directory
+        remote_files = os.listdir(folder_path)
         supported_exts = [".pdf", ".jpg", ".jpeg", ".png"]
 
         for filename in remote_files:
             if any(filename.lower().endswith(ext) for ext in supported_exts):
-                remote_file_path = f"{folder_path}/{filename}"
+                remote_file_path = os.path.join(folder_path, filename)
                 try:
-                    # Download file to temp directory
-                    with TemporaryDirectory() as tmp_file:
-                        tmp_path = Path(tmp_file) / filename
-                        sftp.get(remote_file_path, str(tmp_path))
-                        start_time = datetime.now()
-                        # Read the file content into memory
-                        with open(tmp_path, "rb") as f:
-                            content = f.read()
+                    start_time = datetime.now()
+                    # Read the file content into memory
+                    with open(remote_file_path, "rb") as f:
+                        content = f.read()
 
-                        # Create a SpooledTemporaryFile and UploadFile wrapper
-                        spooled_file = SpooledTemporaryFile()
-                        spooled_file.write(content)
-                        spooled_file.seek(0)
+                    # Create a SpooledTemporaryFile and UploadFile wrapper
+                    spooled_file = SpooledTemporaryFile()
+                    spooled_file.write(content)
+                    spooled_file.seek(0)
 
-                        upload_file = UploadFile(filename=filename, file=spooled_file)
+                    upload_file = UploadFile(filename=filename, file=spooled_file)
 
-                        # ✅ Call your FastAPI OCR processor
-                        final_output = await ocr_process_file(upload_file, doctype)
-                        end_time = datetime.now()
-                        duration = (end_time - start_time).total_seconds()
-                        # Add to processed summary
-                        print('review final_output and get the value    -> ', final_output)
-                        processInfo = final_output["data"]
-                        processed.append({
-                            "filename": filename,
-                            "processId": processInfo["processId"],
-                            "filePath": processInfo["filePath"],
-                            "fileDir": processInfo["fileDir"],
-                            "document_type": processInfo["document_type"],
-                            "fileType": processInfo["fileType"],
-                            "start_time": start_time.isoformat(),
-                            "end_time": end_time.isoformat(),
-                            "duration_seconds": duration
-                        })
+                    # ✅ Call your FastAPI OCR processor
+                    final_output = await ocr_process_file(upload_file, doctype)
+                    end_time = datetime.now()
+                    duration = (end_time - start_time).total_seconds()
+                    # Add to processed summary
+                    print('review final_output and get the value    -> ', final_output)
+                    processInfo = final_output["data"]
+                    processed.append({
+                        "filename": filename,
+                        "processId": processInfo["processId"],
+                        "filePath": processInfo["filePath"],
+                        "fileDir": processInfo["fileDir"],
+                        "document_type": processInfo["document_type"],
+                        "fileType": processInfo["fileType"],
+                        "start_time": start_time.isoformat(),
+                        "end_time": end_time.isoformat(),
+                        "duration_seconds": duration
+                    })
 
                 except Exception as e:
                     print(f"❌ Error processing {filename}: {e}")
-
-                finally:
-                    # 🧹 Clean up temporary file        
-                    if tmp_path.exists():
-                        tmp_path.unlink()
-
-        sftp.close()
-        transport.close()
 
     except Exception as e:
         return {"error": str(e)}
     
     REMOTE_DIR = "/files/ocr_files"
-    # Upload to SFTP using your common method
+    # Save results locally instead of uploading to SFTP
     json_str = json.dumps(processed, indent=4, default=convert_ndarray)
     json_bytes = json_str.encode("utf-8") # Encode to bytes
-    remote_file_name = f"bulk_processed_final.json" # Define the remote file name and directory
-    upload_to_sftp(json_bytes, remote_file_name, REMOTE_DIR)
+    local_file_name = f"bulk_processed_final.json" # Define the local file name and directory
+    
+    # Ensure directory exists
+    os.makedirs(REMOTE_DIR, exist_ok=True)
+    local_file_path = os.path.join(REMOTE_DIR, local_file_name)
+    
+    with open(local_file_path, "wb") as f:
+        f.write(json_bytes)
+    
+    print(f"💾 Batch results saved locally: {local_file_path}")
+    
     return {"processed": processed}
 
 
@@ -260,37 +256,25 @@ async def upload_csv(file: UploadFile = File(...), document_type: Literal["INVOI
 
     # Set the filename
     filename = "Invoice_allkeys.csv" if document_type == "INVOICE" else "Bankstmt_allkeys.csv"
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
     SFTP_UPLOAD_DIR = "/files/ocr_files/"
+    
     # Read file content into memory
     content = await file.read()
-    file_obj = BytesIO(content)
 
     try:
-        # Connect to SFTP
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        # Ensure directory exists or create
-        try:
-            sftp.chdir(SFTP_UPLOAD_DIR)
-        except IOError:
-            sftp.mkdir(SFTP_UPLOAD_DIR)
-            sftp.chdir(SFTP_UPLOAD_DIR)
+        # Ensure directory exists locally
+        os.makedirs(SFTP_UPLOAD_DIR, exist_ok=True)
+        
+        # Save file locally
+        local_file_path = os.path.join(SFTP_UPLOAD_DIR, filename)
+        with open(local_file_path, "wb") as f:
+            f.write(content)
 
-        # Upload and replace if exists
-        sftp.putfo(file_obj, os.path.join(SFTP_UPLOAD_DIR, filename))
-
-        sftp.close()
-        transport.close()
-
+        print(f"💾 CSV file saved locally: {local_file_path}")
         return JSONResponse(content={"status": "success", "message": f"Uploaded as {filename}"})
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SFTP Upload Failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Local Upload Failed: {e}")
 
 
 ############################################################

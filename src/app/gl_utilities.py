@@ -8,7 +8,9 @@ import os
 import paramiko
 import time
 import io
+import shutil
 
+from collections import defaultdict
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -300,101 +302,118 @@ def getSFTP(file_content: bytes, filename: str, remote_dir) -> str:
     except Exception as e:
         raise RuntimeError(f"SFTP Upload Failed: {e}")
 
+def upload_to_sftp_local(file_content: bytes, filename: str, remote_dir) -> str:
+    """Local file handler to replace SFTP uploads"""
+    try:
+        # Ensure the directory exists
+        os.makedirs(remote_dir, exist_ok=True)
+        
+        # Create the full file path
+        file_path = os.path.join(remote_dir, filename)
+        
+        # Write the file content
+        with open(file_path, "wb") as f:
+            f.write(file_content)
+        
+        print(f"💾 File saved locally: {file_path}")
+        return file_path
+    except Exception as e:
+        print(f"❌ Error saving file locally: {e}")
+        raise e
+
 def upload_to_sftp(file_content: bytes, filename: str, remote_dir) -> str:
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
-
-    remote_path = f"{remote_dir}/{filename}"
-
-    try:
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        try:
-            ensure_remote_dir_exists(sftp, remote_dir)
-        except Exception as e:
-            raise RuntimeError(f"Failed to create remote directory '{remote_dir}': {e}")
-
-        # Upload the file
-        try:
-            with sftp.file(remote_path, 'wb') as remote_file:
-                remote_file.write(file_content)
-        except Exception as e:
-            raise RuntimeError(f"Failed to upload file to '{remote_path}': {e}")
-
-        sftp.close()
-        transport.close()
-
-        return remote_path
-    except Exception as e:
-        raise RuntimeError(f"SFTP Upload Failed: {e}")
+    """SFTP upload function - now uses local file handling"""
+    return upload_to_sftp_local(file_content, filename, remote_dir)
     
+def download_from_sftp_local(remote_filepath: str, local_filepath: str) -> None:
+    """Local version of download_from_sftp"""
+    try:
+        # For local handling, just copy the file
+        if os.path.exists(remote_filepath):
+            shutil.copy2(remote_filepath, local_filepath)
+            print(f"💾 File copied locally: {remote_filepath} -> {local_filepath}")
+        else:
+            raise FileNotFoundError(f"Source file not found: {remote_filepath}")
+    except Exception as e:
+        print(f"❌ Error copying file locally: {e}")
+        raise e
+
 def download_from_sftp(remote_filepath: str, local_filepath: str) -> None:
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+    """SFTP download function - now uses local file handling"""
+    return download_from_sftp_local(remote_filepath, local_filepath)
 
+def read_file_from_sftp_local(remote_filepath: str) -> bytes:
+    """Local version of read_file_from_sftp"""
     try:
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        try:
-            sftp.get(remote_filepath, local_filepath)
-        except Exception as e:
-            raise RuntimeError(f"Failed to download file from '{remote_filepath}': {e}")
-
-        sftp.close()
-        transport.close()
-
+        if os.path.exists(remote_filepath):
+            with open(remote_filepath, "rb") as f:
+                content = f.read()
+            print(f"💾 File read locally: {remote_filepath}")
+            return content
+        else:
+            raise FileNotFoundError(f"Source file not found: {remote_filepath}")
     except Exception as e:
-        raise RuntimeError(f"SFTP Download Failed: {e}")
-    
+        print(f"❌ Error reading file locally: {e}")
+        raise e
+
 def read_file_from_sftp(remote_filepath: str) -> bytes:
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
+    """SFTP read function - now uses local file handling"""
+    return read_file_from_sftp_local(remote_filepath)
 
+def read_file_from_sftpFldr_local(remote_path: str) -> list:
+    """Local version of read_file_from_sftpFldr"""
     try:
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        try:
-            with sftp.file(remote_filepath, "rb") as remote_file:
-                content = remote_file.read()
-        except Exception as e:
-            raise RuntimeError(f"Failed to read file from '{remote_filepath}': {e}")
-        finally:
-            sftp.close()
-            transport.close()
-
-        return content
-
+        if os.path.exists(remote_path) and os.path.isdir(remote_path):
+            remote_files = os.listdir(remote_path)
+            print(f"💾 Files listed locally: {remote_path}")
+            return remote_files
+        else:
+            raise FileNotFoundError(f"Directory not found: {remote_path}")
     except Exception as e:
-        raise RuntimeError(f"SFTP Read Failed: {e}")
-
-def read_file_from_sftpFldr(remote_path: str) -> bytes:
-    SFTP_HOST = os.getenv("SFTP_HOST")
-    SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
-    SFTP_USERNAME = os.getenv("SFTP_USERNAME")
-    SFTP_PASSWORD = os.getenv("SFTP_PASSWORD")
-    try:
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USERNAME, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        # List files in remote directory
-        remote_files = sftp.listdir(remote_path)
-        return remote_files
-    except Exception as e:
+        print(f"❌ Error listing files locally: {e}")
         return {"error": str(e)}
-    
+
+def read_file_from_sftpFldr(remote_path: str) -> list:
+    """SFTP folder listing function - now uses local file handling"""
+    return read_file_from_sftpFldr_local(remote_path)
+
+def group_files_by_page(filename,file_list):
+    grouped = defaultdict(list)
+    pattern = re.compile(rf"({re.escape(filename)}-(\d+))")
+
+    for fname in file_list:
+        match = pattern.match(fname)
+        if match:
+            base, page_num = match.groups()
+            grouped[f"page{page_num}"].append(fname)
+    return grouped
+
+def move_files_pagewise_local(filename, remote_dir):
+    """Local version of move_files_pagewise_sftp"""
+    try:
+        # List files in local directory
+        file_list = os.listdir(remote_dir)
+        pagewise_files = group_files_by_page(filename, file_list)
+
+        for page, files in pagewise_files.items():
+            target_folder = os.path.join(remote_dir, page)
+            # Create folder if not exists
+            os.makedirs(target_folder, exist_ok=True)
+
+            for file_name in files:
+                old_path = os.path.join(remote_dir, file_name)
+                new_path = os.path.join(target_folder, file_name)
+                print(f"Moving: {old_path} -> {new_path}")
+                shutil.move(old_path, new_path)
+                
+    except Exception as e:
+        print(f"❌ Error moving files locally: {e}")
+        raise e
+
+def move_files_pagewise_sftp(filename, remote_dir):
+    """SFTP file moving function - now uses local file handling"""
+    return move_files_pagewise_local(filename, remote_dir)
+
     
 def convert_ndarray(obj):
     if isinstance(obj, dict):
